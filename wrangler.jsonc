@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vedouci-souteze",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "account_id": "5ba0d7cc5a68236aa70b51ac7c7e2613",
+  "workers_dev": true,
+  // Same origin for SPA + API: the Worker runs first only for /api/*,
+  // everything else is a static asset with SPA fallback to index.html.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // Custom domain is attached at first deploy (see doc/feat-deploy.md).
+  // "routes": [{ "pattern": "vedouci.sachytynec.cz", "custom_domain": true }],
+  "vars": {
+    // Anything other than "development" behaves as production (dev-login disabled).
+    "ENVIRONMENT": "production",
+    // Comma-separated emails auto-approved as admin on first Google login.
+    "ADMIN_EMAILS": "karel.jukl@gmail.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vedouci-souteze-db",
+      // Placeholder until `wrangler d1 create vedouci-souteze-db` (local dev works without it).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true }
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+*.log
+.DS_Store
+
+# Real-world test material with third-party personal data (phones, e-mails, birth years) — keep local only.
+doc/soupisky/
+doc/rpb_26_27_uz_v3.docx
