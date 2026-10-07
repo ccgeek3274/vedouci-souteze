@@ -68,4 +68,4 @@ Viz plán; zavádí se postupně migracemi:
 - `doc/Rozpis_soutezi_SSS_2026_27.pdf`, `doc/Rozdeleni_druzstev_KP_KS_RP_SSS_2026_2027.pdf`
 - `doc/rpb_26_27_uz_v3.docx` (mimo git) — reálný úvodní zpravodaj RPB 2026/27 (generovaný uvodni-zpravodaj + ručně doplněné
   texty, tabulka hracích místností, adresář kapitánů). Vzor cílového výstupu M8.
-- `doc/soupisky/` (mimo git — osobní údaje) — reálné e-soupisky RPB 2026/27 od kapitánů, viz [`analyza-soupisek.md`](analyza-soupisek.md).
+- `doc/soupisky/` — reálné e-soupisky (telefony, e-maily a domácí adresy anonymizovány, jména zachována) RPB 2026/27 od kapitánů, viz [`analyza-soupisek.md`](analyza-soupisek.md).

@@ -1,7 +1,8 @@
 # Analýza reálných e-soupisek (RPB 2026/27)
 
 Vstup pro M5 (import soupisek). Soubory v `doc/soupisky/` poslali kapitáni e-mailem; obsahují chyby
-a část informací přišla jinou cestou (e-mail, telefon). **Pro chybné formáty se nevyvíjí žádná funkcionalita** —
+a část informací přišla jinou cestou (e-mail, telefon). Telefony, e-maily a domácí adresy jsou anonymizované
+(deterministicky: stejný kontakt = stejná náhrada, e-mail `prijmeni.jmeno@example.cz`), jména hráčů a kontaktů zůstala. **Pro chybné formáty se nevyvíjí žádná funkcionalita** —
 import je musí jen srozumitelně odmítnout, data zadá vedoucí ručně.
 
 ## Přehled
@@ -17,7 +18,7 @@ import je musí jen srozumitelně odmítnout, data zadá vedoucí ručně.
 | Soupiska Sokol Brandýs n.L.B.xlsx | šablona 2026/27 | 17 hráčů |
 | Mšeno soupiska.xlsx | **starší varianta šablony** | hráči od ř. 9, bez sloupce FIDE (E=Označení, F=Z), bez sekcí „Další požadavky“ a „Komunikace“ |
 | Soupiska_Excel_2026 Bakov C.xlsx | **vlastní formát** | jiné rozložení i sloupce (VT, Elo) → nepodporovat, ruční zadání |
-| E-soupiska_2026-2027_polabí.xls | **binární .xls (BIFF)** | ExcelJS neumí → nepodporovat, výzva „uložte jako .xlsx“ |
+| E-soupiska_2026-2027_polabí.xls | **binární .xls (BIFF), vlastní rozložení** | ExcelJS neumí → nepodporovat, výzva „uložte jako .xlsx“ |
 
 ## Důsledky pro import (M5)
 - Nehledat pevné adresy buněk (`fillSoupiska` konstanty), ale **kotvy podle textu ve sloupci A**:
