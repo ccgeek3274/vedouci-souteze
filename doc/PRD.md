@@ -52,11 +52,11 @@ Viz plán; zavádí se postupně migracemi:
 ## Etapy
 | Etapa | Obsah | Stav |
 |---|---|---|
-| M1 | Kostra (Worker + D1 + React), auth, správa uživatelů, deploy | hotovo lokálně |
-| M2 | chess.cz proxy (cache, 3 req/s), CRUD soutěže, kola a termíny | |
-| M3 | Družstva: pořadí, přejmenování, záloha, kontakty, párování na chess.cz | |
-| M4 | Import rozpisu / rozdělení (JSON schéma, API s dry-run, skill `import-rozpis`) | |
-| M5 | Import soupisek (xlsx e-soupiska, JSON draft v1, skill `import-soupiska`), verze, požadavky | |
+| M1 | Kostra (Worker + D1 + React), auth, správa uživatelů, deploy | hotovo, nasazeno |
+| M2 | chess.cz proxy (cache, 3 req/s), CRUD soutěže, kola a termíny | hotovo |
+| M3 | Družstva: pořadí, přejmenování, záloha, kontakty, párování na chess.cz | hotovo |
+| M4 | Import rozpisu / rozdělení (JSON schéma, API s dry-run, skill `import-rozpis`) | hotovo |
+| M5 | Import soupisek (xlsx e-soupiska, JSON draft v1, skill `import-soupiska`), verze, požadavky | hotovo |
 | M6 | Verifikace soupisek proti chess.cz, nedostatky, vyškrtnutí | |
 | M7 | Losovací schůze: přehledy, Berger, kontroly pravidel, řízené losování | |
 | M8 | Úvodní zpravodaj (předběžný / definitivní), DOCX + PDF, verze | |

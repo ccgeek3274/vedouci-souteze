@@ -13,6 +13,7 @@ export function Layout() {
         </div>
         <nav className="app-nav">
           <NavLink to="/" end>Soutěže</NavLink>
+          <NavLink to="/tokeny">API tokeny</NavLink>
           {user?.role === 'admin' && <NavLink to="/admin">Uživatelé</NavLink>}
           <span className="user">{user?.name}</span>
           <button className="btn btn-small" onClick={logout}>Odhlásit</button>

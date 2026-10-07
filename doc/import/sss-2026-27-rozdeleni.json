@@ -1,0 +1,691 @@
+{
+  "format": "vedouci-souteze/competitions",
+  "version": 1,
+  "source": {
+    "document": "Rozdeleni_druzstev_KP_KS_RP_SSS_2026_2027.pdf",
+    "kind": "rozdeleni",
+    "date": "2026-07-27"
+  },
+  "season": "2026/2027",
+  "region": "Středočeský šachový svaz (SŠS)",
+  "competitions": [
+    {
+      "short": "KP",
+      "level": "KP",
+      "group": "",
+      "name": "Krajský přebor",
+      "boards": 8,
+      "default_start": "10:00",
+      "time_control": "90 min./40 tahů + 30 min. do konce partie s přidáváním 30 sekund na každý tah od začátku partie",
+      "manager": {
+        "name": "Kubíček Robert",
+        "phone": "775 287 421",
+        "email": "robert.kubicek@seznam.cz"
+      },
+      "mutual_deadline": "2026-12-31",
+      "rounds": [
+        {
+          "round": 1,
+          "date": "2026-10-18"
+        },
+        {
+          "round": 2,
+          "date": "2026-11-08"
+        },
+        {
+          "round": 3,
+          "date": "2026-11-22"
+        },
+        {
+          "round": 4,
+          "date": "2026-12-06"
+        },
+        {
+          "round": 5,
+          "date": "2027-01-10"
+        },
+        {
+          "round": 6,
+          "date": "2027-01-24"
+        },
+        {
+          "round": 7,
+          "date": "2027-02-07"
+        },
+        {
+          "round": 8,
+          "date": "2027-02-21"
+        },
+        {
+          "round": 9,
+          "date": "2027-03-14"
+        },
+        {
+          "round": 10,
+          "date": "2027-04-04"
+        },
+        {
+          "round": 11,
+          "date": "2027-04-18"
+        }
+      ],
+      "teams": [
+        {
+          "name": "ŠK Český Brod A"
+        },
+        {
+          "name": "TJ Kralupy A"
+        },
+        {
+          "name": "ŠK Medvědi Zvole A"
+        },
+        {
+          "name": "ŠK Zdice A"
+        },
+        {
+          "name": "Šachklub města Dobrovice A"
+        },
+        {
+          "name": "Sokol Kolín A"
+        },
+        {
+          "name": "Šachový klub Bakov nad Jizerou B"
+        },
+        {
+          "name": "Joly Lysá nad Labem D"
+        },
+        {
+          "name": "ŠS Kostelec nad Černými lesy A"
+        },
+        {
+          "name": "TJ Kralupy B"
+        },
+        {
+          "name": "Šachový klub Dubno A"
+        },
+        {
+          "name": "DDM Sokol Nymburk A"
+        }
+      ]
+    },
+    {
+      "short": "KSA",
+      "level": "KS",
+      "group": "A",
+      "name": "Krajská soutěž A",
+      "boards": 8,
+      "default_start": "10:00",
+      "time_control": "90 min./40 tahů + 30 min. do konce partie s přidáváním 30 sekund na každý tah od začátku partie",
+      "manager": {
+        "name": "Havelka Petr",
+        "phone": "602 124 564",
+        "email": "havelka.sachy@wo.cz"
+      },
+      "mutual_deadline": "2026-12-31",
+      "rounds": [
+        {
+          "round": 1,
+          "date": "2026-10-11"
+        },
+        {
+          "round": 2,
+          "date": "2026-11-01"
+        },
+        {
+          "round": 3,
+          "date": "2026-11-15"
+        },
+        {
+          "round": 4,
+          "date": "2026-11-29"
+        },
+        {
+          "round": 5,
+          "date": "2026-12-13"
+        },
+        {
+          "round": 6,
+          "date": "2027-01-17"
+        },
+        {
+          "round": 7,
+          "date": "2027-01-31"
+        },
+        {
+          "round": 8,
+          "date": "2027-02-14"
+        },
+        {
+          "round": 9,
+          "date": "2027-02-28"
+        },
+        {
+          "round": 10,
+          "date": "2027-03-21"
+        },
+        {
+          "round": 11,
+          "date": "2027-04-11"
+        }
+      ],
+      "teams": [
+        {
+          "name": "Šachklub města Dobrovice B"
+        },
+        {
+          "name": "TJ Hostivice A"
+        },
+        {
+          "name": "Český lev Kolešovice B"
+        },
+        {
+          "name": "TJ Neratovice B"
+        },
+        {
+          "name": "TJ Neratovice C"
+        },
+        {
+          "name": "Sokol Buštěhrad A"
+        },
+        {
+          "name": "ŠK Řevnice A"
+        },
+        {
+          "name": "ŠK Rakovník A"
+        },
+        {
+          "name": "Caissa Roztoky A"
+        },
+        {
+          "name": "Šachklub města Dobrovice C"
+        },
+        {
+          "name": "Šachový klub Velvary A"
+        },
+        {
+          "name": "TJ Sokol Mladá Boleslav B"
+        }
+      ]
+    },
+    {
+      "short": "KSB",
+      "level": "KS",
+      "group": "B",
+      "name": "Krajská soutěž B",
+      "boards": 8,
+      "default_start": "10:00",
+      "time_control": "90 min./40 tahů + 30 min. do konce partie s přidáváním 30 sekund na každý tah od začátku partie",
+      "manager": {
+        "name": "Havelka Petr",
+        "phone": "602 124 564",
+        "email": "havelka.sachy@wo.cz"
+      },
+      "mutual_deadline": "2026-12-31",
+      "rounds": [
+        {
+          "round": 1,
+          "date": "2026-10-11"
+        },
+        {
+          "round": 2,
+          "date": "2026-11-01"
+        },
+        {
+          "round": 3,
+          "date": "2026-11-15"
+        },
+        {
+          "round": 4,
+          "date": "2026-11-29"
+        },
+        {
+          "round": 5,
+          "date": "2026-12-13"
+        },
+        {
+          "round": 6,
+          "date": "2027-01-17"
+        },
+        {
+          "round": 7,
+          "date": "2027-01-31"
+        },
+        {
+          "round": 8,
+          "date": "2027-02-14"
+        },
+        {
+          "round": 9,
+          "date": "2027-02-28"
+        },
+        {
+          "round": 10,
+          "date": "2027-03-21"
+        },
+        {
+          "round": 11,
+          "date": "2027-04-11"
+        }
+      ],
+      "teams": [
+        {
+          "name": "ŠS Kostelec nad Černými lesy B"
+        },
+        {
+          "name": "TJ Spartak Vlašim C"
+        },
+        {
+          "name": "Joly Lysá nad Labem E"
+        },
+        {
+          "name": "Klub šachistů Říčany 1925 E"
+        },
+        {
+          "name": "Město Poděbrady A"
+        },
+        {
+          "name": "ŠK Spartak Čelákovice A"
+        },
+        {
+          "name": "Jawa Brodce A"
+        },
+        {
+          "name": "Sokol Kolín B"
+        },
+        {
+          "name": "Sokol Brandýs nad Labem A"
+        },
+        {
+          "name": "ŠK KDJS Sedlčany A"
+        },
+        {
+          "name": "Klub šachistů Říčany 1925 F"
+        },
+        {
+          "name": "Sokol Pečky A"
+        }
+      ]
+    },
+    {
+      "short": "RPA",
+      "level": "RP",
+      "group": "A",
+      "name": "Regionální přebor A",
+      "boards": 8,
+      "default_start": "09:00",
+      "time_control": "90 min./40 tahů + 30 min. do konce partie s přidáváním 30 sekund na každý tah od začátku partie",
+      "manager": {
+        "name": "Kubíček Robert",
+        "phone": "775 287 421",
+        "email": "robert.kubicek@seznam.cz"
+      },
+      "mutual_deadline": "2026-12-31",
+      "rounds": [
+        {
+          "round": 1,
+          "date": "2026-10-18"
+        },
+        {
+          "round": 2,
+          "date": "2026-11-08"
+        },
+        {
+          "round": 3,
+          "date": "2026-11-22"
+        },
+        {
+          "round": 4,
+          "date": "2026-12-06"
+        },
+        {
+          "round": 5,
+          "date": "2027-01-10"
+        },
+        {
+          "round": 6,
+          "date": "2027-01-24"
+        },
+        {
+          "round": 7,
+          "date": "2027-02-07"
+        },
+        {
+          "round": 8,
+          "date": "2027-02-21"
+        },
+        {
+          "round": 9,
+          "date": "2027-03-14"
+        },
+        {
+          "round": 10,
+          "date": "2027-04-04"
+        },
+        {
+          "round": 11,
+          "date": "2027-04-18"
+        }
+      ],
+      "teams": [
+        {
+          "name": "ŠK Kladno A"
+        },
+        {
+          "name": "SK DDM Slaný"
+        },
+        {
+          "name": "Český lev Kolešovice C"
+        },
+        {
+          "name": "ŠO TP NOVA Kladno A"
+        },
+        {
+          "name": "Městský šachový klub Libčice nad Vltavou A"
+        },
+        {
+          "name": "Stochov A"
+        },
+        {
+          "name": "Sokol Buštěhrad B"
+        },
+        {
+          "name": "Caissa Roztoky B"
+        },
+        {
+          "name": "ŠK Rakovník B"
+        },
+        {
+          "name": "TJ Kralupy nad Vltavou D"
+        }
+      ]
+    },
+    {
+      "short": "RPB",
+      "level": "RP",
+      "group": "B",
+      "name": "Regionální přebor B",
+      "boards": 8,
+      "default_start": "09:00",
+      "time_control": "90 min./40 tahů + 30 min. do konce partie s přidáváním 30 sekund na každý tah od začátku partie",
+      "manager": {
+        "name": "Jukl Karel",
+        "phone": "602 123 971",
+        "email": "kareljukl@live.com"
+      },
+      "mutual_deadline": "2026-12-31",
+      "rounds": [
+        {
+          "round": 1,
+          "date": "2026-10-18"
+        },
+        {
+          "round": 2,
+          "date": "2026-11-08"
+        },
+        {
+          "round": 3,
+          "date": "2026-11-22"
+        },
+        {
+          "round": 4,
+          "date": "2026-12-06"
+        },
+        {
+          "round": 5,
+          "date": "2027-01-10"
+        },
+        {
+          "round": 6,
+          "date": "2027-01-24"
+        },
+        {
+          "round": 7,
+          "date": "2027-02-07"
+        },
+        {
+          "round": 8,
+          "date": "2027-02-21"
+        },
+        {
+          "round": 9,
+          "date": "2027-03-14"
+        },
+        {
+          "round": 10,
+          "date": "2027-04-04"
+        },
+        {
+          "round": 11,
+          "date": "2027-04-18"
+        }
+      ],
+      "teams": [
+        {
+          "name": "TJ Neratovice D"
+        },
+        {
+          "name": "Mšeno"
+        },
+        {
+          "name": "Šachový klub Bakov nad Jizerou C"
+        },
+        {
+          "name": "Šachklub města Dobrovice D"
+        },
+        {
+          "name": "Šachklub města Dobrovice E"
+        },
+        {
+          "name": "TJ AŠ Mladá Boleslav A"
+        },
+        {
+          "name": "Sokol Brandýs nad Labem B"
+        },
+        {
+          "name": "Odolena Voda A"
+        },
+        {
+          "name": "TJ Kralupy nad Vltavou C"
+        },
+        {
+          "name": "ŠK Spartak Čelákovice B"
+        },
+        {
+          "name": "ŠACHY PRO RADOST!! A"
+        }
+      ]
+    },
+    {
+      "short": "RPC",
+      "level": "RP",
+      "group": "C",
+      "name": "Regionální přebor C",
+      "boards": 8,
+      "default_start": "09:00",
+      "time_control": "90 min./40 tahů + 30 min. do konce partie s přidáváním 30 sekund na každý tah od začátku partie",
+      "manager": {
+        "name": "Padevět Pavel",
+        "phone": "603 598 399",
+        "email": "p.padevet@seznam.cz"
+      },
+      "mutual_deadline": "2026-12-31",
+      "rounds": [
+        {
+          "round": 1,
+          "date": "2026-10-18"
+        },
+        {
+          "round": 2,
+          "date": "2026-11-08"
+        },
+        {
+          "round": 3,
+          "date": "2026-11-22"
+        },
+        {
+          "round": 4,
+          "date": "2026-12-06"
+        },
+        {
+          "round": 5,
+          "date": "2027-01-10"
+        },
+        {
+          "round": 6,
+          "date": "2027-01-24"
+        },
+        {
+          "round": 7,
+          "date": "2027-02-07"
+        },
+        {
+          "round": 8,
+          "date": "2027-02-21"
+        },
+        {
+          "round": 9,
+          "date": "2027-03-14"
+        },
+        {
+          "round": 10,
+          "date": "2027-04-04"
+        },
+        {
+          "round": 11,
+          "date": "2027-04-18"
+        }
+      ],
+      "teams": [
+        {
+          "name": "Sokol Kolín C"
+        },
+        {
+          "name": "TJ Sparta Kutná Hora B"
+        },
+        {
+          "name": "Slavoj Čáslav A"
+        },
+        {
+          "name": "Sokol Sendražice A"
+        },
+        {
+          "name": "DDM Sokol Nymburk B"
+        },
+        {
+          "name": "Sokol Pečky B"
+        },
+        {
+          "name": "ŠK Český Brod B"
+        },
+        {
+          "name": "ŠK JOLY Lysá nad Labem F"
+        },
+        {
+          "name": "ŠK JOLY Lysá nad Labem G"
+        },
+        {
+          "name": "Šachy Polabí A"
+        }
+      ]
+    },
+    {
+      "short": "RPD",
+      "level": "RP",
+      "group": "D",
+      "name": "Regionální přebor D",
+      "boards": 8,
+      "default_start": "09:00",
+      "time_control": "90 min./40 tahů + 30 min. do konce partie s přidáváním 30 sekund na každý tah od začátku partie",
+      "manager": {
+        "name": "Padevět Pavel",
+        "phone": "603 598 399",
+        "email": "p.padevet@seznam.cz"
+      },
+      "mutual_deadline": "2026-12-31",
+      "rounds": [
+        {
+          "round": 1,
+          "date": "2026-10-18"
+        },
+        {
+          "round": 2,
+          "date": "2026-11-08"
+        },
+        {
+          "round": 3,
+          "date": "2026-11-22"
+        },
+        {
+          "round": 4,
+          "date": "2026-12-06"
+        },
+        {
+          "round": 5,
+          "date": "2027-01-10"
+        },
+        {
+          "round": 6,
+          "date": "2027-01-24"
+        },
+        {
+          "round": 7,
+          "date": "2027-02-07"
+        },
+        {
+          "round": 8,
+          "date": "2027-02-21"
+        },
+        {
+          "round": 9,
+          "date": "2027-03-14"
+        },
+        {
+          "round": 10,
+          "date": "2027-04-04"
+        },
+        {
+          "round": 11,
+          "date": "2027-04-18"
+        }
+      ],
+      "teams": [
+        {
+          "name": "ŠK Dubno B"
+        },
+        {
+          "name": "ŠK Hostomice A"
+        },
+        {
+          "name": "ŠK Hostomice B"
+        },
+        {
+          "name": "ŠK Zdice B"
+        },
+        {
+          "name": "ŠK KDJS Sedlčany B"
+        },
+        {
+          "name": "Mníšek"
+        },
+        {
+          "name": "Zvole B"
+        },
+        {
+          "name": "Klub šachistů Říčany 1925 G"
+        },
+        {
+          "name": "Klub šachistů Říčany 1925 I (hraje pod názvem KŠ Stříbrná Skalice A)"
+        },
+        {
+          "name": "Klub šachistů Říčany 1925 H"
+        },
+        {
+          "name": "TJ Spartak Vlašim D"
+        },
+        {
+          "name": "Sokol Struhařov A"
+        }
+      ]
+    }
+  ]
+}

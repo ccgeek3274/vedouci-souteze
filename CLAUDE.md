@@ -20,6 +20,8 @@ Zadání: `doc/vedouci_podklady.md`, produktová specifikace: `doc/PRD.md`.
 - `npm run check` (tsc web + worker), `npm test` (vitest), `npm run build`.
 - `./deploy.sh` — check, test, build, remote migrace, `wrangler deploy`. Vždy nejdřív commit + push.
 - wrangler spouštěj bez proxy proměnných (`env -u https_proxy -u HTTPS_PROXY -u http_proxy -u HTTP_PROXY`).
+- `npm run cli -- …` (scripts/cli.ts, esbuild bundle) — import rozpisu/soupisek přes API; používají ho skills
+  `.claude/skills/import-rozpis` a `import-soupiska`. `scripts/seed-demo.sh` = demo RPB 2026/27.
 
 ## Konvence
 - Kód a komentáře anglicky, UI a chybové hlášky API česky. Commity česky bez diakritiky, conventional-commit styl.
@@ -27,6 +29,13 @@ Zadání: `doc/vedouci_podklady.md`, produktová specifikace: `doc/PRD.md`.
 - Vlastnictví dat: každý uživatel vidí jen soutěže, které sám založil (`owner_id`); admin jen spravuje uživatele.
   Tabulky s daty uživatele mají FK s `ON DELETE CASCADE` (D1 vynucuje foreign keys) — smazání uživatele smaže jeho data.
 - Zdroj pravdy je chess.cz; v D1 ukládáme jen to, co nejde znovu načíst (vlastní údaje, párování ID, snapshoty zpravodajů).
+
+## Gotchas
+- Lokální D1 (`.wrangler/state`) je vázaná na `database_id` — po jeho změně je prázdná (migrace + seed znovu).
+- React Router 6: relativní `<Link to>` se skládá k cestě *routy* (`druzstva` → `druzstva/t/…`); mezi sourozeneckými
+  záložkami soutěže používej `../t/…`.
+- Web nesmí importovat z `worker/` (typy Workers) — sdílené typy patří do `shared/`.
+- Párování názvů družstev: `teamNameScore` (`shared/text.ts`) — různá písmena družstev (D/E) se nikdy nespárují.
 
 ## chess.cz API
 - `https://api.chess.cz/api`, spec v `/home/ccuser/git/pgn-base/apichesscz.openapi.yaml`.
