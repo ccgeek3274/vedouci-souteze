@@ -11,5 +11,5 @@ export type RosterImportPreview = {
   warnings: string[];
   teamChanges: { field: 'venue' | 'shoes' | 'start_pref' | 'draw_requests' | 'club_name'; from: string; to: string }[];
   contacts: { replace: boolean; from: Contact[]; to: Contact[] };
-  newRequests: { kind: string; text: string }[];
+  newRequests: { kind: string; text: string; time: string | null; side: 'home' | 'away' | null }[];
 };

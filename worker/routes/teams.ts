@@ -5,6 +5,7 @@ import { applyRosterImport, previewRosterImport, type ContactRole } from '../lib
 import { TEAM_FIELDS, TEAM_NUMERIC } from './competitions';
 import { normalizeDraft } from '../../shared/roster/draft';
 import { bestTeamMatch, teamNameScore } from '../../shared/text';
+import { normTime, parseStartTime, shortTime, type StartSide } from '../../shared/startTime';
 import type { AppEnv } from '../types';
 
 const teams = new Hono<AppEnv>();
@@ -37,6 +38,11 @@ teams.patch('/teams/:teamId', async (c) => {
   const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null), TEAM_FIELDS, TEAM_NUMERIC);
   if ('name' in f && !f.name) return c.json({ error: 'Název družstva nesmí být prázdný' }, 400);
   if ('status' in f && f.status !== 'active' && f.status !== 'reserve') return c.json({ error: 'Neplatný stav' }, 400);
+  for (const k of ['start_home', 'start_away'] as const) {
+    if (!(k in f)) continue;
+    f[k] = f[k] ? normTime(f[k]) : null;
+    if (f[k] === '') return c.json({ error: 'Začátek musí mít tvar HH:MM' }, 400);
+  }
   if (!Object.keys(f).length) return c.json({ error: 'Nic ke změně' }, 400);
   const stmts = [updateStatement(c.env.DB, 'teams', team.id, f as Record<string, string | number | null>)];
   if (f.status === 'active' && team.status === 'reserve') {
@@ -129,41 +135,100 @@ teams.post('/competitions/:id/rosters/import', async (c) => {
 
 // ---- Requests for the draw meeting -----------------------------------------------------------
 
+type RequestRow = { id: number; competition_id: string; team_id: string | null; kind: string; text: string; status: string; time: string | null; side: string | null };
+
+const describeStart = (time: string, side: StartSide) => `${side === 'home' ? 'domácí' : 'venkovní'} utkání v ${shortTime(time)}`;
+
+/**
+ * An accepted start-time request is the team's start exception (teams.start_home / start_away).
+ * Undo the effect of the request's previous state, then apply the new one.
+ */
+function syncTeamStart(db: D1Database, before: RequestRow | null, after: RequestRow | null): D1PreparedStatement[] {
+  const effective = (r: RequestRow | null) =>
+    r && r.kind === 'start_time' && r.status === 'accepted' && r.team_id && r.time && (r.side === 'home' || r.side === 'away') ? r : null;
+  const out: D1PreparedStatement[] = [];
+  const b = effective(before);
+  const a = effective(after);
+  if (b && !(a && a.side === b.side && a.time === b.time && a.team_id === b.team_id)) {
+    const col = b.side === 'home' ? 'start_home' : 'start_away';
+    out.push(db.prepare(`UPDATE teams SET ${col} = NULL, updated_at = ? WHERE id = ? AND ${col} = ?`).bind(now(), b.team_id, b.time));
+  }
+  if (a) {
+    const col = a.side === 'home' ? 'start_home' : 'start_away';
+    out.push(db.prepare(`UPDATE teams SET ${col} = ?, updated_at = ? WHERE id = ?`).bind(a.time, now(), a.team_id));
+  }
+  return out;
+}
+
 teams.post('/competitions/:id/requests', async (c) => {
   const comp = await ownedCompetition(c, c.req.param('id'));
   if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
-  const body = await c.req.json<{ team_id?: string; kind?: string; text?: string; round?: number }>().catch(() => null);
-  if (!body?.text?.trim() || !REQUEST_KINDS.includes(body.kind ?? '')) return c.json({ error: 'Zadejte typ a text požadavku' }, 400);
-  if (body.team_id) {
-    const team = await ownedTeam(c, body.team_id);
+  const body = await c.req.json<{ team_id?: string; kind?: string; text?: string; round?: number; time?: string; side?: string }>().catch(() => null);
+  if (!REQUEST_KINDS.includes(body?.kind ?? '')) return c.json({ error: 'Zadejte typ požadavku' }, 400);
+  let time: string | null = null;
+  let side: StartSide | null = null;
+  let text = body?.text?.trim() ?? '';
+  if (body!.kind === 'start_time') {
+    const parsed = parseStartTime(text);
+    time = normTime(body!.time) || parsed?.time || '';
+    side = body!.side === 'away' || body!.side === 'home' ? body!.side : parsed?.side ?? 'home';
+    if (!time) return c.json({ error: 'Zadejte čas začátku ve tvaru HH:MM' }, 400);
+    if (!body!.team_id) return c.json({ error: 'Požadavek na začátek utkání musí mít družstvo' }, 400);
+    text ||= describeStart(time, side);
+  }
+  if (!text) return c.json({ error: 'Zadejte text požadavku' }, 400);
+  if (body!.team_id) {
+    const team = await ownedTeam(c, body!.team_id);
     if (!team || team.competition_id !== comp.id) return c.json({ error: 'Družstvo nepatří do této soutěže' }, 400);
   }
-  await c.env.DB.prepare('INSERT INTO requests (competition_id, team_id, kind, text, round, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(comp.id, body.team_id ?? null, body.kind, body.text.trim(), body.round ?? null, 'manual', now()).run();
+  await c.env.DB.prepare('INSERT INTO requests (competition_id, team_id, kind, text, round, time, side, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(comp.id, body!.team_id ?? null, body!.kind, text, body!.round ?? null, time, side, 'manual', now()).run();
   return c.json({ ok: true }, 201);
 });
 
-async function ownedRequest(c: any, id: string) {
+async function ownedRequest(c: any, id: string): Promise<RequestRow | null> {
   return c.env.DB.prepare(
-    'SELECT r.id FROM requests r JOIN competitions co ON co.id = r.competition_id WHERE r.id = ? AND co.owner_id = ?'
+    'SELECT r.* FROM requests r JOIN competitions co ON co.id = r.competition_id WHERE r.id = ? AND co.owner_id = ?'
   ).bind(id, c.get('user').id).first();
 }
 
 teams.patch('/requests/:reqId', async (c) => {
-  if (!(await ownedRequest(c, c.req.param('reqId')))) return c.json({ error: 'Požadavek nenalezen' }, 404);
-  const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null), ['kind', 'text', 'round', 'status', 'decision'] as const, ['round'] as const);
+  const before = await ownedRequest(c, c.req.param('reqId'));
+  if (!before) return c.json({ error: 'Požadavek nenalezen' }, 404);
+  const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null), ['kind', 'text', 'round', 'status', 'decision', 'time', 'side'] as const, ['round'] as const);
   if ('kind' in f && !REQUEST_KINDS.includes(String(f.kind))) return c.json({ error: 'Neplatný typ' }, 400);
   if ('status' in f && !REQUEST_STATUSES.includes(String(f.status))) return c.json({ error: 'Neplatný stav' }, 400);
+  if ('side' in f && f.side !== 'home' && f.side !== 'away') return c.json({ error: 'Neplatná strana (home/away)' }, 400);
+  if ('time' in f) {
+    f.time = f.time ? normTime(f.time) : null;
+    if (f.time === '') return c.json({ error: 'Čas musí mít tvar HH:MM' }, 400);
+  }
+  const after = { ...before, ...f } as RequestRow;
+  if (after.kind === 'start_time') {
+    // Older rows (before structured times) carry only text — derive the time when it gets decided.
+    const parsed = parseStartTime(after.text);
+    after.time ??= parsed?.time ?? null;
+    after.side ??= parsed?.side ?? 'home';
+    f.time = after.time;
+    f.side = after.side;
+    if (after.status === 'accepted' && !after.time) return c.json({ error: 'Nejdřív zadejte čas začátku (HH:MM)' }, 400);
+  }
   const keys = Object.keys(f);
   if (!keys.length) return c.json({ error: 'Nic ke změně' }, 400);
-  await c.env.DB.prepare(`UPDATE requests SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`)
-    .bind(...keys.map((k) => (f as any)[k]), c.req.param('reqId')).run();
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE requests SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).bind(...keys.map((k) => (f as any)[k]), before.id),
+    ...syncTeamStart(c.env.DB, before, after),
+  ]);
   return c.json({ ok: true });
 });
 
 teams.delete('/requests/:reqId', async (c) => {
-  if (!(await ownedRequest(c, c.req.param('reqId')))) return c.json({ error: 'Požadavek nenalezen' }, 404);
-  await c.env.DB.prepare('DELETE FROM requests WHERE id = ?').bind(c.req.param('reqId')).run();
+  const before = await ownedRequest(c, c.req.param('reqId'));
+  if (!before) return c.json({ error: 'Požadavek nenalezen' }, 404);
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM requests WHERE id = ?').bind(before.id),
+    ...syncTeamStart(c.env.DB, before, null),
+  ]);
   return c.json({ ok: true });
 });
 

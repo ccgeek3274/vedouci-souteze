@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import { czDateTime, ROLE_LABEL } from '../../lib/format';
+import { shortTime } from '../../../../shared/startTime';
+import { parseContactPaste } from '../../../../shared/contacts';
 import type { Contact, RosterPlayer, RosterVersion, Team } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 
@@ -23,6 +25,12 @@ const TEXT_FIELDS: { key: keyof Team; label: string; wide?: boolean }[] = [
   { key: 'notes', label: 'Poznámky', wide: true },
 ];
 const ROLES: Contact['role'][] = ['kapitan', 'zastupce', 'komunikace', 'rozhodci'];
+
+/** Players that need a document: H (guest) → hosting permit, C (foreigner) → foreigner document. */
+function needsDocument(flags: string): string {
+  const f = flags.split(' ');
+  return f.includes('H') ? 'povolení hostování' : f.includes('C') ? 'doklad cizince' : '';
+}
 
 export function TeamDetail() {
   const { teamId = '' } = useParams();
@@ -66,7 +74,7 @@ export function TeamDetail() {
             <>
               {data.roster.filename && <p className="helper-text" style={{ marginTop: 0 }}>Zdroj: {data.roster.filename}</p>}
               <table className="table">
-                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th><th>Povolení host.</th></tr></thead>
+                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th><th title="H — povolení hostování, C — doklad cizince">Doloženo</th></tr></thead>
                 <tbody>
                   {data.roster.players.map((p) => (
                     <tr key={p.id} className={p.struck ? 'struck' : undefined}>
@@ -77,11 +85,11 @@ export function TeamDetail() {
                       <td className="num">{p.fide ?? ''}</td>
                       <td>{p.flags.split(' ').filter(Boolean).map((f) => <span key={f} className="chip active" style={{ marginRight: 4 }}>{f}</span>)}</td>
                       <td>{p.base ? <span className="chip active">Z</span> : null}</td>
-                      <td>{/\bH\b/.test(p.flags) && (
-                        <label className="row" style={{ gap: 6 }}>
+                      <td>{needsDocument(p.flags) && (
+                        <label className="row" style={{ gap: 6 }} title={needsDocument(p.flags)}>
                           <input type="checkbox" checked={!!p.guest_permit}
                             onChange={async (e) => { await api.patch(`/roster-players/${p.id}`, { guest_permit: e.target.checked ? 1 : 0 }); refresh(); }} />
-                          <span className="muted">doloženo</span>
+                          <span className={p.guest_permit ? undefined : 'muted'}>{p.guest_permit ? 'doloženo' : 'chybí doklad'}</span>
                         </label>
                       )}</td>
                     </tr>
@@ -100,7 +108,10 @@ function TeamFields({ team, onSaved }: { team: Team; onSaved: () => Promise<void
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => setForm(Object.fromEntries([...TEXT_FIELDS.map((f) => [f.key, String(team[f.key] ?? '')]), ['draw_no', String(team.draw_no ?? '')]])), [team]);
+  useEffect(() => setForm(Object.fromEntries([
+    ...TEXT_FIELDS.map((f) => [f.key, String(team[f.key] ?? '')]),
+    ['draw_no', String(team.draw_no ?? '')], ['start_home', team.start_home ?? ''], ['start_away', team.start_away ?? ''],
+  ])), [team]);
 
   const save = async () => {
     setError(null);
@@ -139,6 +150,12 @@ function TeamFields({ team, onSaved }: { team: Team; onSaved: () => Promise<void
             ))}
             <div className="field"><label>Losovací číslo</label>
               <input className="input mono" value={form.draw_no ?? ''} onChange={(e) => setForm({ ...form, draw_no: e.target.value.replace(/\D/g, '') })} /></div>
+            <div className="grid-2">
+              <div className="field"><label>Jiný začátek doma</label>
+                <input type="time" className="input mono" value={form.start_home ?? ''} onChange={(e) => setForm({ ...form, start_home: e.target.value })} /></div>
+              <div className="field"><label>Jiný začátek venku</label>
+                <input type="time" className="input mono" value={form.start_away ?? ''} onChange={(e) => setForm({ ...form, start_away: e.target.value })} /></div>
+            </div>
           </div>
         ) : (
           <dl className="dl">
@@ -146,6 +163,12 @@ function TeamFields({ team, onSaved }: { team: Team; onSaved: () => Promise<void
               <Fragment key={f.key}><dt>{f.label}</dt><dd>{String(team[f.key] ?? '') || <span className="muted">—</span>}</dd></Fragment>
             ))}
             <dt>Losovací číslo</dt><dd className="mono">{team.draw_no ?? <span className="muted">—</span>}</dd>
+            <dt>Jiný začátek</dt>
+            <dd className="mono">
+              {!team.start_home && !team.start_away && <span className="muted">výchozí</span>}
+              {team.start_home && <div>domácí utkání {shortTime(team.start_home)}</div>}
+              {team.start_away && <div>utkání venku {shortTime(team.start_away)}</div>}
+            </dd>
           </dl>
         )}
       </div>
@@ -171,6 +194,22 @@ function Contacts({ teamId, contacts, onSaved }: { teamId: string; contacts: Con
   };
   const set = (i: number, patch: Partial<Contact>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
+  // Pasting cells copied from Excel (name | phone | e-mail, any order, one contact per line) fills the row;
+  // further lines become new contacts with the same role.
+  const onPaste = (i: number) => (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const parsed = parseContactPaste(e.clipboardData.getData('text'));
+    if (!parsed) return;
+    e.preventDefault();
+    const role = rows[i].role;
+    const [first, ...more] = parsed;
+    setRows([
+      ...rows.slice(0, i),
+      { ...rows[i], ...first },
+      ...more.map((p) => ({ role, ...p })),
+      ...rows.slice(i + 1),
+    ]);
+  };
+
   return (
     <div className="card">
       <div className="card-strip">
@@ -192,9 +231,9 @@ function Contacts({ teamId, contacts, onSaved }: { teamId: string; contacts: Con
                 <tr key={i}>
                   <td><select className="input input-sm" value={r.role} onChange={(e) => set(i, { role: e.target.value as Contact['role'] })}>
                     {ROLES.map((x) => <option key={x} value={x}>{ROLE_LABEL[x]}</option>)}</select></td>
-                  <td><input className="input input-sm" value={r.name} onChange={(e) => set(i, { name: e.target.value })} /></td>
-                  <td><input className="input input-sm" value={r.phone} onChange={(e) => set(i, { phone: e.target.value })} /></td>
-                  <td><input className="input input-sm" value={r.email} onChange={(e) => set(i, { email: e.target.value })} /></td>
+                  <td><input className="input input-sm" value={r.name} onPaste={onPaste(i)} onChange={(e) => set(i, { name: e.target.value })} /></td>
+                  <td><input className="input input-sm" value={r.phone} onPaste={onPaste(i)} onChange={(e) => set(i, { phone: e.target.value })} /></td>
+                  <td><input className="input input-sm" value={r.email} onPaste={onPaste(i)} onChange={(e) => set(i, { email: e.target.value })} /></td>
                   <td className="actions"><button className="icon-btn" onClick={() => setRows(rows.filter((_, j) => j !== i))}>✕</button></td>
                 </tr>
               ) : (
@@ -206,7 +245,12 @@ function Contacts({ teamId, contacts, onSaved }: { teamId: string; contacts: Con
             </tbody>
           </table>
         )}
-        {edit && <button className="btn btn-small" style={{ marginTop: 12 }} onClick={() => setRows([...rows, { role: 'komunikace', name: '', phone: '', email: '' }])}>+ Přidat kontakt</button>}
+        {edit && (
+          <div className="row" style={{ marginTop: 12 }}>
+            <button className="btn btn-small" onClick={() => setRows([...rows, { role: 'komunikace', name: '', phone: '', email: '' }])}>+ Přidat kontakt</button>
+            <span className="helper-text">Tip: do libovolného pole lze vložit (Ctrl+V) buňky zkopírované z Excelu — jméno, telefon a e-mail v libovolném pořadí, i více řádků najednou.</span>
+          </div>
+        )}
       </div>
     </div>
   );

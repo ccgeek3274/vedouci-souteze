@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { authRequired } from '../middleware/auth';
 import { CONTACT_ORDER_SQL, now, ownedCompetition, pick, updateStatement, type TeamRow } from '../lib/db';
 import { LEVELS } from '../../shared/import/competition';
+import { parseStartTime } from '../../shared/startTime';
 import type { AppEnv } from '../types';
 
 const competitions = new Hono<AppEnv>();
@@ -13,7 +14,7 @@ const EDITABLE = [
 ] as const;
 const NUMERIC = ['boards', 'chesscz_comp_id'] as const;
 const PHASES = ['preparation', 'draw', 'running', 'finished'];
-const TEAM_FIELDS = ['name', 'club_name', 'club_code', 'chesscz_team_id', 'draw_no', 'status', 'venue', 'shoes', 'start_pref', 'draw_requests', 'notes'] as const;
+const TEAM_FIELDS = ['name', 'club_name', 'club_code', 'chesscz_team_id', 'draw_no', 'status', 'venue', 'shoes', 'start_pref', 'start_home', 'start_away', 'draw_requests', 'notes'] as const;
 const TEAM_NUMERIC = ['chesscz_team_id', 'draw_no'] as const;
 
 function validate(f: Record<string, unknown>): string | null {
@@ -87,7 +88,11 @@ competitions.get('/:id', async (c) => {
     competition: comp,
     rounds: rounds.results,
     teams: (teams.results as TeamRow[]).map((t) => ({ ...t, contacts: contactsByTeam[t.id] ?? [], roster: rosterByTeam[t.id] ?? null })),
-    requests: requests.results,
+    requests: (requests.results as any[]).map((r) => {
+      if (r.kind !== 'start_time' || r.time) return r;
+      const p = parseStartTime(r.text);
+      return { ...r, time: p?.time ?? null, side: r.side ?? p?.side ?? 'home' };
+    }),
   });
 });
 

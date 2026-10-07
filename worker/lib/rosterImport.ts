@@ -4,6 +4,7 @@ import { diffRosters } from '../../shared/roster/diff';
 import type { Contact, ContactRole, RosterImportPreview } from '../../shared/roster/importPreview';
 import { draftWarnings, type DraftContact, type RosterDraft } from '../../shared/roster/draft';
 import { fold } from '../../shared/text';
+import { parseStartTime } from '../../shared/startTime';
 import { CONTACT_ORDER_SQL, CONTACT_ROLE_ORDER, now, type TeamRow } from './db';
 
 export type { ContactRole };
@@ -55,9 +56,12 @@ export async function previewRosterImport(db: D1Database, team: TeamRow & { boar
   const order = (l: Contact[]) => [...l].sort((a, b) => CONTACT_ROLE_ORDER.indexOf(a.role) - CONTACT_ROLE_ORDER.indexOf(b.role) || a.position - b.position);
 
   const { results: existingReq } = await db.prepare('SELECT text FROM requests WHERE team_id = ?').bind(team.id).all<{ text: string }>();
-  const newRequests = [
-    { kind: 'start_time', text: draft.extra.preferZacatek },
-    { kind: 'other', text: draft.extra.pozadavkyLosovani },
+  const start = parseStartTime(draft.extra.preferZacatek);
+  const newRequests: RosterImportPreview['newRequests'] = [
+    // A preference with a time is a start-time request (home matches unless it says otherwise);
+    // text without a time stays a generic request for the vedoucí to sort out.
+    { kind: start ? 'start_time' : 'other', text: draft.extra.preferZacatek, time: start?.time ?? null, side: start?.side ?? null },
+    { kind: 'other', text: draft.extra.pozadavkyLosovani, time: null, side: null },
   ].filter((r) => r.text && !existingReq.some((e) => fold(e.text) === fold(r.text)));
 
   return {
@@ -104,8 +108,8 @@ export async function applyRosterImport(
     }
   }
   for (const r of preview.newRequests) {
-    stmts.push(db.prepare(`INSERT INTO requests (competition_id, team_id, kind, text, source, created_at) VALUES (?, ?, ?, ?, 'roster', ?)`)
-      .bind(meta.competitionId, team.id, r.kind, r.text, t));
+    stmts.push(db.prepare(`INSERT INTO requests (competition_id, team_id, kind, text, time, side, source, created_at) VALUES (?, ?, ?, ?, ?, ?, 'roster', ?)`)
+      .bind(meta.competitionId, team.id, r.kind, r.text, r.time, r.side, t));
   }
   stmts.push(db.prepare(
     `INSERT INTO import_log (owner_id, competition_id, source, filename, summary, created_at) VALUES (?, ?, ?, ?, ?, ?)`

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import type { TeamWithSummary } from '../../lib/types';
 import { bestTeamMatch, fold } from '../../../../shared/text';
+import { shortTime } from '../../../../shared/startTime';
 import { useCompetition } from './CompetitionLayout';
 
 type TableRow = { teamId: number; teamName: string };
@@ -50,7 +51,7 @@ export function Teams() {
         <div className="card-body table-scroll">
           {!active.length ? <p className="muted">Žádná družstva. Naimportujte rozdělení družstev nebo je přidejte ručně.</p> : (
             <table className="table">
-              <thead><tr><th>#</th><th>Družstvo</th><th>Soupiska</th><th>Kapitán</th><th>Hrací místnost</th><th>Los. č.</th><th /></tr></thead>
+              <thead><tr><th>#</th><th>Družstvo</th><th>Soupiska</th><th>Kapitán</th><th>Hrací místnost</th><th>Začátek</th><th>Los. č.</th><th /></tr></thead>
               <tbody>
                 {active.map((t, i) => (
                   <tr key={t.id}>
@@ -65,6 +66,10 @@ export function Teams() {
                     <td>{t.roster ? <span className="tag ok">{t.roster.players} hráčů · v{t.roster.version}</span> : <span className="tag bad">chybí</span>}</td>
                     <td>{captain(t)?.name ?? <span className="muted">—</span>}</td>
                     <td style={{ maxWidth: 280 }}>{t.venue || <span className="muted">—</span>}</td>
+                    <td className="mono" style={{ whiteSpace: 'nowrap' }}>
+                      {t.start_home && <div>doma {shortTime(t.start_home)}</div>}
+                      {t.start_away && <div>venku {shortTime(t.start_away)}</div>}
+                    </td>
                     <td className="mono">{t.draw_no ?? ''}</td>
                     <td className="actions">
                       <button className="icon-btn" title="Nahoru" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>

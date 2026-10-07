@@ -12,7 +12,7 @@ export type Contact = { id?: number; role: 'kapitan' | 'zastupce' | 'komunikace'
 export type Team = {
   id: string; competition_id: string; name: string; club_name: string; club_code: string | null;
   chesscz_team_id: number | null; position: number; draw_no: number | null; status: 'active' | 'reserve';
-  venue: string; shoes: string; start_pref: string; draw_requests: string; notes: string;
+  venue: string; shoes: string; start_pref: string; start_home: string | null; start_away: string | null; draw_requests: string; notes: string;
 };
 export type TeamWithSummary = Team & {
   contacts: Contact[];
@@ -21,6 +21,7 @@ export type TeamWithSummary = Team & {
 export type Request = {
   id: number; competition_id: string; team_id: string | null; kind: string; text: string; round: number | null;
   status: 'new' | 'accepted' | 'rejected'; decision: string; source: string; created_at: number;
+  time: string | null; side: 'home' | 'away' | null;
 };
 export type CompetitionDetail = { competition: Competition; rounds: Round[]; teams: TeamWithSummary[]; requests: Request[] };
 export type RosterPlayer = {

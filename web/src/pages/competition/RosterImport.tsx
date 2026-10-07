@@ -4,6 +4,7 @@ import { api, apiErrorText } from '../../lib/api';
 import { readRosterFile } from '../../lib/rosterFile';
 import { ROLE_LABEL, REQUEST_KIND_LABEL } from '../../lib/format';
 import { FileDrop } from '../../components/FileDrop';
+import { shortTime } from '../../../../shared/startTime';
 import type { RosterDraft } from '../../../../shared/roster/draft';
 import type { RosterImportPreview } from '../../../../shared/roster/importPreview';
 import { useCompetition } from './CompetitionLayout';
@@ -157,7 +158,10 @@ function ImportCard({ it, teams, onTeam, onConfirm, onDismiss }: {
                       {p.contacts.replace && p.contacts.to.map((ct, i) => (
                         <FieldChange key={`c${i}`} label={ROLE_LABEL[ct.role]} to={[ct.name, ct.phone, ct.email].filter(Boolean).join(' · ')} />
                       ))}
-                      {p.newRequests.map((r, i) => <FieldChange key={`r${i}`} label={`Požadavek: ${REQUEST_KIND_LABEL[r.kind]}`} to={r.text} />)}
+                      {p.newRequests.map((r, i) => (
+                        <FieldChange key={`r${i}`} label={`Požadavek: ${REQUEST_KIND_LABEL[r.kind]}`}
+                          to={r.time ? `${r.side === 'away' ? 'utkání venku' : 'domácí utkání'} v ${shortTime(r.time)} („${r.text}“)` : r.text} />
+                      ))}
                     </dl>
                   </>
                 )}

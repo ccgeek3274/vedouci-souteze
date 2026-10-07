@@ -37,3 +37,22 @@ Bundluje se esbuildem; server `VS_URL`, token `VS_TOKEN` nebo `~/.config/vedouci
 RPB 2026/27 z reálných podkladů v `doc/` + výsledek losovací schůze podle skutečného úvodního zpravodaje:
 Čelákovice B a ŠACHY PRO RADOST!! A do zálohy, přidáno Šachy Polabí A, párování s chess.cz 3468, losovací čísla.
 Bakov C (vlastní formát) a Polabí (.xls) zůstávají bez soupisky — ukázka ručního doplnění. Skript je idempotentní.
+
+## Začátky utkání (požadavky → výjimky družstva)
+Model převzatý z uvodni-zpravodaj (`cfg.home` / `cfg.away`, `matchTime`, `requirementLines`):
+- Družstvo má `start_home` / `start_away` (HH:MM, NULL = výchozí začátek soutěže). V posledním kole se neuplatní.
+- Požadavek typu „Začátek utkání“ nese `time` + `side`. Z textu soupisky se čas odvodí (`shared/startTime.ts`,
+  `parseStartTime`): samotné číslo / čas („10hod“, „10:00“, „10“, „9.30“) = domácí utkání; „venku“, „hosté“ = venkovní.
+  Text bez času zůstane obecným požadavkem. Starší záznamy bez `time` se odvozují při čtení.
+- **Vyhověno** = čas se propíše do družstva; změna strany/času nebo zamítnutí/smazání propsání vrátí
+  (`syncTeamStart` ve `worker/routes/teams.ts`). Výjimku lze nastavit i přímo v detailu družstva.
+- Záložka Požadavky ukazuje souhrn „Jiné začátky utkání“ ve stejném znění jako úvodní zpravodaj.
+
+## Doloženo (H, C)
+Hráč s označením H (povolení hostování) nebo C (doklad cizince) má v soupisce zaškrtávátko „doloženo“
+(`roster_players.guest_permit`). Vstup pro verifikaci a vyškrtnutí v M6.
+
+## Kontakty z Excelu
+Vložení (Ctrl+V) buněk zkopírovaných z Excelu do kteréhokoli pole kontaktu (`shared/contacts.ts`,
+`parseContactPaste`): buňky se rozpoznají podle obsahu (e-mail „@“, telefon ≥ 9 číslic, jinak jméno),
+pořadí nehraje roli; více řádků = více kontaktů se stejnou rolí. Funguje i jeden řádek textu oddělený čárkami.
