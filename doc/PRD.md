@@ -57,7 +57,7 @@ Viz plán; zavádí se postupně migracemi:
 | M3 | Družstva: pořadí, přejmenování, záloha, kontakty, párování na chess.cz | hotovo |
 | M4 | Import rozpisu / rozdělení (JSON schéma, API s dry-run, skill `import-rozpis`) | hotovo |
 | M5 | Import soupisek (xlsx e-soupiska, JSON draft v1, skill `import-soupiska`), verze, požadavky | hotovo |
-| M6 | Verifikace soupisek proti chess.cz, nedostatky, vyškrtnutí | |
+| M6 | Verifikace soupisek proti chess.cz, nedostatky, vyškrtnutí | hotovo (viz `feat-kontrola-soupisek.md`) |
 | M7 | Losovací schůze: přehledy, Berger, kontroly pravidel, řízené losování | |
 | M8 | Úvodní zpravodaj (předběžný / definitivní), DOCX + PDF, verze | |
 | M9 | Zpravodaje z kol, snapshoty pořadí, poznámky | |

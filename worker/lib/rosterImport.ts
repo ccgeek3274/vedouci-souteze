@@ -86,15 +86,27 @@ export async function applyRosterImport(
   const version = (preview.previousVersion ?? 0) + 1;
   const versionId = crypto.randomUUID();
   const t = now();
+  // The vedoucí's marks (documents, strikes) and the chess.cz check follow the player into the new version.
+  const { results: prev } = await db.prepare(
+    `SELECT rp.name, rp.lok, rp.guest_permit, rp.struck, rp.struck_reason, rp.cz_json, rp.cz_checked_at
+     FROM roster_players rp JOIN roster_versions rv ON rv.id = rp.roster_version_id WHERE rv.team_id = ? AND rv.version = ?`
+  ).bind(team.id, preview.previousVersion ?? 0).all<any>();
+  const carryKey = (lok: unknown, name: string) => (lok ? `lok:${lok}` : `name:${fold(name)}`);
+  const carried = new Map(prev.map((r) => [carryKey(r.lok, r.name), r]));
   const stmts: D1PreparedStatement[] = [
     db.prepare(
       `INSERT INTO roster_versions (id, team_id, version, source, filename, base_count, created_by, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(versionId, team.id, version, meta.source, meta.filename, draft.zakladCount, meta.userId, t),
-    ...draft.players.map((p, i) => db.prepare(
-      `INSERT INTO roster_players (roster_version_id, position, name, birth_year, lok, fide, flags, base)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(versionId, i + 1, p.jmeno, p.rok || null, p.lok || null, p.fide || null, p.ozn, p.z ? 1 : 0)),
+    ...draft.players.map((p, i) => {
+      const o = carried.get(carryKey(p.lok, p.jmeno));
+      return db.prepare(
+        `INSERT INTO roster_players (roster_version_id, position, name, birth_year, lok, fide, flags, base,
+                                     guest_permit, struck, struck_reason, cz_json, cz_checked_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(versionId, i + 1, p.jmeno, p.rok || null, p.lok || null, p.fide || null, p.ozn, p.z ? 1 : 0,
+        o?.guest_permit ?? 0, o?.struck ?? 0, o?.struck_reason ?? '', o?.cz_json ?? null, o?.cz_checked_at ?? null);
+    }),
   ];
   if (preview.teamChanges.length) {
     const sets = preview.teamChanges.map((ch) => `${ch.field} = ?`).join(', ');

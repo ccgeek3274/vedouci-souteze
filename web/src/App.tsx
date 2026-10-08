@@ -13,6 +13,7 @@ import { Teams } from './pages/competition/Teams';
 import { RosterImport } from './pages/competition/RosterImport';
 import { Requests } from './pages/competition/Requests';
 import { TeamDetail } from './pages/competition/TeamDetail';
+import { RosterCheck } from './pages/competition/RosterCheck';
 
 export function App() {
   return (
@@ -26,6 +27,7 @@ export function App() {
             <Route index element={<Overview />} />
             <Route path="druzstva" element={<Teams />} />
             <Route path="soupisky" element={<RosterImport />} />
+            <Route path="kontrola" element={<RosterCheck />} />
             <Route path="pozadavky" element={<Requests />} />
             <Route path="t/:teamId" element={<TeamDetail />} />
           </Route>

@@ -34,6 +34,7 @@ export function CompetitionLayout() {
         <NavLink to="" end>Přehled</NavLink>
         <NavLink to="druzstva">Družstva</NavLink>
         <NavLink to="soupisky">Import soupisek</NavLink>
+        <NavLink to="kontrola">Kontrola soupisek</NavLink>
         <NavLink to="pozadavky">Požadavky{newRequests ? ` (${newRequests})` : ''}</NavLink>
       </nav>
       <Outlet context={{ data, refresh } satisfies CompetitionCtx} />

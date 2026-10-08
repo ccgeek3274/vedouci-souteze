@@ -109,6 +109,9 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
 .note { padding: 10px 14px; border-left: 4px solid var(--ink); background: var(--highlight); border-radius: var(--radius); margin-bottom: 14px; }
 .note.warn { border-left-color: oklch(0.60 0.13 70); background: oklch(0.95 0.04 85); }
 .list-plain { margin: 6px 0 0; padding-left: 18px; }
+.issues { font-size: 12.5px; line-height: 1.45; }
+.issues .bad { color: var(--danger); }
+.issues .warn { color: oklch(0.45 0.11 60); }
 .list-plain li { margin: 2px 0; }
 
 .input-sm { height: 32px; padding: 0 8px; font-size: 13.5px; }

@@ -7,6 +7,9 @@ import { shortTime } from '../../../../shared/startTime';
 import { parseContactPaste } from '../../../../shared/contacts';
 import type { Contact, RosterPlayer, RosterVersion, Team } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
+import { IssueList, useRosterCheck } from './RosterCheck';
+import { checkTeamRoster, checkedAt, competitionIssues } from '../../lib/rosterCheck';
+import { strikeReason } from '../../../../shared/roster/verify';
 
 type TeamResponse = {
   team: Team & { boards: number };
@@ -18,6 +21,7 @@ type TeamResponse = {
 const TEXT_FIELDS: { key: keyof Team; label: string; wide?: boolean }[] = [
   { key: 'name', label: 'Název družstva' },
   { key: 'club_name', label: 'Oddíl' },
+  { key: 'club_code', label: 'Č. oddílu (chess.cz)' },
   { key: 'venue', label: 'Hrací místnost', wide: true },
   { key: 'shoes', label: 'Přezůvky' },
   { key: 'start_pref', label: 'Preference začátku domácích utkání' },
@@ -34,7 +38,10 @@ function needsDocument(flags: string): string {
 
 export function TeamDetail() {
   const { teamId = '' } = useParams();
-  const { refresh: refreshCompetition } = useCompetition();
+  const { data: comp, refresh: refreshCompetition } = useCompetition();
+  const check = useRosterCheck(comp.competition.id);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [version, setVersion] = useState<number | null>(null);
   const key = ['team', teamId, version];
@@ -44,11 +51,28 @@ export function TeamDetail() {
   });
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['team', teamId] });
+    await queryClient.invalidateQueries({ queryKey: ['roster-check', comp.competition.id] });
     await refreshCompetition();
   };
 
   if (isLoading || !data) return <p style={{ color: 'var(--cream)' }}>Načítání…</p>;
   const t = data.team;
+  const latest = !!data.roster && data.roster.version === data.versions[0]?.version;
+  const issues = latest && check.data ? competitionIssues(check.data) : null;
+  const at = data.roster ? checkedAt(data.roster.players) : null;
+  const verify = async () => {
+    setCheckError(null);
+    try {
+      const r = await checkTeamRoster(t, data.roster!.players, (d, n) => setProgress(`${d}/${n}`));
+      if (r.error) setCheckError(`${r.error} — ověřeno jen částečně.`);
+    } catch (e) {
+      setCheckError(apiErrorText(e));
+    } finally {
+      setProgress(null);
+      await refresh();
+    }
+  };
+  const patchPlayer = async (id: number, body: object) => { await api.patch(`/roster-players/${id}`, body); await refresh(); };
   return (
     <>
       <div className="crumbs"><Link to="../druzstva">← Družstva</Link></div>
@@ -57,8 +81,11 @@ export function TeamDetail() {
       <div className="card">
         <div className="card-strip">
           <h2>Soupiska</h2>
-          {data.roster && <span className="helper">{data.roster.players.length} hráčů · {data.roster.players.filter((p) => p.base).length} v základní sestavě</span>}
+          {data.roster && <span className="helper">{data.roster.players.length} hráčů · {data.roster.players.filter((p) => p.base).length} v základní sestavě
+            {latest && (at ? ` · chess.cz ověřeno ${czDateTime(at)}` : ' · neověřeno na chess.cz')}</span>}
           <span className="spacer" />
+          {progress && <span className="muted mono">{progress}</span>}
+          {latest && <button className="btn btn-small" disabled={!!progress} onClick={verify}>Ověřit na chess.cz</button>}
           {data.versions.length > 0 && (
             <select className="input input-sm" value={data.roster?.version ?? ''} onChange={(e) => setVersion(Number(e.target.value))}>
               {data.versions.map((v) => (
@@ -72,9 +99,10 @@ export function TeamDetail() {
             <p className="muted">Soupiska zatím nebyla importována. <Link to="../soupisky">Importovat soupisku</Link></p>
           ) : (
             <>
+              {checkError && <div className="alert">{checkError}</div>}
               {data.roster.filename && <p className="helper-text" style={{ marginTop: 0 }}>Zdroj: {data.roster.filename}</p>}
               <table className="table">
-                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th><th title="H — povolení hostování, C — doklad cizince">Doloženo</th></tr></thead>
+                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th><th title="H — povolení hostování, C — doklad cizince">Doloženo</th>{issues && <><th>Kontrola chess.cz</th><th /></>}</tr></thead>
                 <tbody>
                   {data.roster.players.map((p) => (
                     <tr key={p.id} className={p.struck ? 'struck' : undefined}>
@@ -92,6 +120,24 @@ export function TeamDetail() {
                           <span className={p.guest_permit ? undefined : 'muted'}>{p.guest_permit ? 'doloženo' : 'chybí doklad'}</span>
                         </label>
                       )}</td>
+                      {issues && (
+                        <>
+                          <td style={{ minWidth: 220 }}>
+                            {p.struck ? <div className="issues"><div className="bad">vyškrtnut{p.struck_reason && `: ${p.struck_reason}`}</div></div>
+                              : !p.cz ? <span className="muted" style={{ fontSize: 12.5 }}>neověřeno</span>
+                              : issues.get(p.id)?.length ? <IssueList issues={issues.get(p.id)!} />
+                              : <span className="tag ok">OK</span>}
+                          </td>
+                          <td className="actions">
+                            {p.struck
+                              ? <button className="btn btn-small" onClick={() => patchPlayer(p.id, { struck: 0, struck_reason: '' })}>Vrátit</button>
+                              : <button className={strikeReason(issues.get(p.id) ?? []) ? 'btn btn-small' : 'icon-btn'} title="Vyškrtnout ze soupisky (definitivní zpravodaj)" onClick={() => {
+                                  const reason = window.prompt('Důvod vyškrtnutí', strikeReason(issues.get(p.id) ?? []));
+                                  if (reason !== null) patchPlayer(p.id, { struck: 1, struck_reason: reason });
+                                }}>{strikeReason(issues.get(p.id) ?? []) ? 'Vyškrtnout' : '✕'}</button>}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

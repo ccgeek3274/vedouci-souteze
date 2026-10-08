@@ -6,6 +6,7 @@ import { TEAM_FIELDS, TEAM_NUMERIC } from './competitions';
 import { normalizeDraft } from '../../shared/roster/draft';
 import { bestTeamMatch, teamNameScore } from '../../shared/text';
 import { normTime, parseStartTime, shortTime, type StartSide } from '../../shared/startTime';
+import { requiredFeeYear } from '../../shared/roster/verify';
 import type { AppEnv } from '../types';
 
 const teams = new Hono<AppEnv>();
@@ -27,7 +28,8 @@ teams.get('/teams/:teamId', async (c) => {
   const version = c.req.query('version');
   const chosen = (versions.results as any[]).find((v) => String(v.version) === version) ?? versions.results[0];
   const players = chosen
-    ? (await db.prepare('SELECT * FROM roster_players WHERE roster_version_id = ? ORDER BY position').bind((chosen as any).id).all()).results
+    ? (await db.prepare('SELECT * FROM roster_players WHERE roster_version_id = ? ORDER BY position').bind((chosen as any).id).all<any>()).results
+      .map(({ cz_json, ...p }) => ({ ...p, cz: cz_json ? JSON.parse(cz_json) : null }))
     : [];
   return c.json({ team, contacts: contacts.results, versions: versions.results, roster: chosen ? { ...(chosen as object), players } : null });
 });
@@ -81,7 +83,7 @@ teams.put('/teams/:teamId/contacts', async (c) => {
   return c.json({ ok: true });
 });
 
-// Mark a player of the current roster (guest permit / struck) — M6 verification.
+// Mark a player of the current roster (guest permit / struck) or fix his ids — M6 verification.
 teams.patch('/roster-players/:playerId', async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT rp.id FROM roster_players rp JOIN roster_versions rv ON rv.id = rp.roster_version_id
@@ -89,12 +91,80 @@ teams.patch('/roster-players/:playerId', async (c) => {
      WHERE rp.id = ? AND co.owner_id = ?`
   ).bind(c.req.param('playerId'), c.get('user').id).first();
   if (!row) return c.json({ error: 'Hráč nenalezen' }, 404);
-  const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null), ['guest_permit', 'struck', 'struck_reason'] as const, ['guest_permit', 'struck'] as const);
+  const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null), ['guest_permit', 'struck', 'struck_reason', 'lok', 'fide', 'birth_year'] as const, ['guest_permit', 'struck', 'lok', 'fide', 'birth_year'] as const);
   const keys = Object.keys(f);
   if (!keys.length) return c.json({ error: 'Nic ke změně' }, 400);
-  await c.env.DB.prepare(`UPDATE roster_players SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`)
+  // A changed id makes the stored chess.cz check obsolete.
+  const reset = 'lok' in f || 'fide' in f ? ', cz_json = NULL, cz_checked_at = NULL' : '';
+  await c.env.DB.prepare(`UPDATE roster_players SET ${keys.map((k) => `${k} = ?`).join(', ')}${reset} WHERE id = ?`)
     .bind(...keys.map((k) => (f as any)[k]), c.req.param('playerId')).run();
   return c.json({ ok: true });
+});
+
+// ---- Roster check against chess.cz (M6) -----------------------------------------------------
+// The lookups run in the browser through the chess.cz proxy (progress, no Worker subrequest limits);
+// the server keeps the snapshot per player and the team's club.
+
+const CURRENT_VERSION_SQL = 'rv.version = (SELECT MAX(version) FROM roster_versions x WHERE x.team_id = rv.team_id)';
+
+/** Current rosters of all active teams + where else (user's other competitions of the season) their players are. */
+teams.get('/competitions/:id/roster-check', async (c) => {
+  const comp = await ownedCompetition(c, c.req.param('id'));
+  if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
+  const db = c.env.DB;
+  const [teamRows, players, elsewhere] = await db.batch([
+    db.prepare(`SELECT id, name, club_name, club_code FROM teams WHERE competition_id = ? AND status = 'active' ORDER BY position`).bind(comp.id),
+    db.prepare(
+      `SELECT rp.*, rv.team_id, rv.version FROM roster_players rp
+       JOIN roster_versions rv ON rv.id = rp.roster_version_id JOIN teams t ON t.id = rv.team_id
+       WHERE t.competition_id = ? AND t.status = 'active' AND ${CURRENT_VERSION_SQL} ORDER BY rp.position`
+    ).bind(comp.id),
+    db.prepare(
+      `SELECT rp.lok, co.short, t.name FROM roster_players rp
+       JOIN roster_versions rv ON rv.id = rp.roster_version_id JOIN teams t ON t.id = rv.team_id
+       JOIN competitions co ON co.id = t.competition_id
+       WHERE co.owner_id = ? AND co.season = ? AND co.id != ? AND t.status = 'active' AND rp.lok IS NOT NULL AND ${CURRENT_VERSION_SQL}`
+    ).bind(c.get('user').id, comp.season, comp.id),
+  ]);
+  const byTeam = new Map<string, any[]>();
+  for (const p of players.results as any[]) {
+    const { cz_json, team_id, ...rest } = p;
+    byTeam.set(team_id, [...(byTeam.get(team_id) ?? []), { ...rest, cz: cz_json ? JSON.parse(cz_json) : null }]);
+  }
+  const other: Record<string, string[]> = {};
+  for (const r of elsewhere.results as any[]) (other[r.lok] ??= []).push(`${r.short} · ${r.name}`);
+  return c.json({
+    feeYear: requiredFeeYear(comp.season),
+    teams: (teamRows.results as any[]).map((t) => ({ ...t, players: byTeam.get(t.id) ?? null })),
+    elsewhere: other,
+  });
+});
+
+/** Save the result of a roster check: { club_code?, club_name?, players: [{ id, cz }] } (current version only). */
+teams.put('/teams/:teamId/roster-check', async (c) => {
+  const team = await ownedTeam(c, c.req.param('teamId'));
+  if (!team) return c.json({ error: 'Družstvo nenalezeno' }, 404);
+  const body = await c.req.json<{ club_code?: string; club_name?: string; players?: { id: number; cz: unknown }[] }>().catch(() => null);
+  if (!Array.isArray(body?.players)) return c.json({ error: 'Chybí výsledky kontroly' }, 400);
+  const { results: own } = await c.env.DB.prepare(
+    `SELECT rp.id FROM roster_players rp JOIN roster_versions rv ON rv.id = rp.roster_version_id
+     WHERE rv.team_id = ? AND ${CURRENT_VERSION_SQL}`
+  ).bind(team.id).all<{ id: number }>();
+  const ids = new Set(own.map((r) => r.id));
+  const t = now();
+  const stmts: D1PreparedStatement[] = [];
+  for (const p of body!.players) {
+    const json = JSON.stringify(p.cz ?? null);
+    if (!ids.has(p.id) || !p.cz || json.length > 8000) continue;
+    stmts.push(c.env.DB.prepare('UPDATE roster_players SET cz_json = ?, cz_checked_at = ? WHERE id = ?').bind(json, t, p.id));
+  }
+  const club = String(body!.club_code ?? '').trim();
+  if (/^[\w-]{1,10}$/.test(club) && club !== team.club_code) {
+    stmts.push(updateStatement(c.env.DB, 'teams', team.id, team.club_name || !body!.club_name
+      ? { club_code: club } : { club_code: club, club_name: String(body!.club_name).slice(0, 200) }));
+  }
+  if (stmts.length) await c.env.DB.batch(stmts);
+  return c.json({ ok: true, saved: stmts.length });
 });
 
 /**

@@ -1,3 +1,5 @@
+import type { CzCheck } from '../../../shared/roster/verify';
+
 export type Competition = {
   id: string; season: string; region: string; level: string; group_code: string; short: string; name: string;
   boards: number; default_start: string; time_control: string; manager_name: string; manager_email: string;
@@ -27,5 +29,11 @@ export type CompetitionDetail = { competition: Competition; rounds: Round[]; tea
 export type RosterPlayer = {
   id: number; position: number; name: string; birth_year: number | null; lok: number | null; fide: number | null;
   flags: string; base: number; guest_permit: number; struck: number; struck_reason: string;
+  cz: CzCheck | null; cz_checked_at: number | null;
+};
+export type RosterCheckData = {
+  feeYear: number;
+  teams: { id: string; name: string; club_name: string; club_code: string | null; players: RosterPlayer[] | null }[];
+  elsewhere: Record<string, string[]>;
 };
 export type RosterVersion = { id: string; version: number; source: string; filename: string; base_count: number; created_at: number };
