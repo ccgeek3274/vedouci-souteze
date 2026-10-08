@@ -75,7 +75,9 @@ describe('playerIssues', () => {
     expect(playerIssues(player({}), found(other), ctx).map((i) => i.text)).toEqual(['člen oddílu TJ AERO Odolena Voda — chybí označení H']);
     expect(playerIssues(player({ flags: 'H' }), found({}), ctx).map((i) => i.text)).toEqual(['označen H, ale je členem oddílu družstva']);
     expect(playerIssues(player({ flags: 'H' }), found(other, { hosting: [permit({})] }), ctx)).toEqual([]);
-    expect(strikeReason(playerIssues(player({ flags: 'H' }), found(other, { hosting: [] }), ctx))).toBe('chybí povolení hostování');
+    const missing = playerIssues(player({ flags: 'H' }), found(other, { hosting: [] }), ctx);
+    expect(missing.map((i) => [i.level, i.text])).toEqual([['warn', 'chybí potvrzení hostování']]);
+    expect(strikeReason(missing)).toBe('chybí potvrzení hostování');
     expect(playerIssues(player({ flags: 'H', guest_permit: 1 }), found(other, { hosting: [] }), ctx)).toEqual([]);
     expect(playerIssues(player({ flags: 'H' }), found(other, { hosting: [permit({ comp: "Krajská soutěž 'A'" })] }), ctx).map((i) => i.level)).toEqual(['warn']);
     expect(playerIssues(player({ flags: 'H' }), found(other, { hosting: [permit({ hostClub: '99999', hostClubName: 'Jiný' })] }), ctx)[0].text)
@@ -105,6 +107,10 @@ describe('playerIssues', () => {
     expect(playerIssues(player({ base: 0, flags: 'H', guest_permit: 1 }), null, { ...ctx, expectedZ: 'optional' })).toEqual([]);
     expect(playerIssues(player({ base: 0 }), found({}), { ...ctx, expectedZ: true })[0].text).toBe('má být v základní sestavě (Z)');
     expect(playerIssues(player({ base: 1 }), null, { ...ctx, expectedZ: false })[0].text).toBe('nemá být v základní sestavě (Z)');
+  });
+
+  it('treats a name differing from the id as a deficiency', () => {
+    expect(playerIssues(player({ name: 'Novák Josef' }), found({}), ctx).map((i) => [i.level, i.text])).toEqual([['bad', 'jméno nesouhlasí s ID — na chess.cz „Novák Jan“']]);
   });
 
   it('reports missing ids', () => {
@@ -145,12 +151,13 @@ describe('helpers', () => {
 describe('parseZCell', () => {
   it('accepts yes in various forms and reports extra words', async () => {
     const { parseZCell } = await import('../roster/xlsx');
-    expect(parseZCell('ano')).toEqual({ z: true, rest: '' });
-    expect(parseZCell('Ano, ml.')).toEqual({ z: true, rest: 'ml.' });
-    expect(parseZCell('Z')).toEqual({ z: true, rest: '' });
-    expect(parseZCell('z.')).toEqual({ z: true, rest: '' });
-    expect(parseZCell('ne')).toEqual({ z: false, rest: '' });
-    expect(parseZCell('st.')).toEqual({ z: false, rest: 'st.' });
-    expect(parseZCell('')).toEqual({ z: false, rest: '' });
+    expect(parseZCell('ano')).toEqual({ z: true, unusual: false });
+    expect(parseZCell(' ANO ')).toEqual({ z: true, unusual: false });
+    expect(parseZCell('')).toEqual({ z: false, unusual: false });
+    expect(parseZCell('ano,ml.')).toEqual({ z: true, unusual: true });
+    expect(parseZCell('Z')).toEqual({ z: true, unusual: false });
+    expect(parseZCell('x')).toEqual({ z: true, unusual: true });
+    expect(parseZCell('ne')).toEqual({ z: false, unusual: true });
+    expect(parseZCell('st.')).toEqual({ z: false, unusual: true });
   });
 });

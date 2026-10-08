@@ -296,7 +296,8 @@ export function playerIssues(p: CheckPlayer & { base?: number }, check: CzCheck 
       out.push({ level: 'bad', strike: true, text: `bez platné registrace v ŠSČR (${m.registration || 'neznámá'})` });
     }
     if (foreign && reg === 'aktivni') out.push({ level: 'bad', text: 'označen C, ale na chess.cz není registrován jako cizinec' });
-    if (m.fullName && !sameName(p.name, m.fullName)) out.push({ level: 'warn', text: `na chess.cz jako „${m.fullName}“` });
+    // The player is identified by his ids; a different name usually means a typo in the LOK / FIDE id.
+    if (m.fullName && !sameName(p.name, m.fullName)) out.push({ level: 'bad', text: `jméno nesouhlasí s ID — na chess.cz „${m.fullName.trim()}“` });
     if (p.birth_year && m.birthYear && p.birth_year !== m.birthYear) out.push({ level: 'warn', text: `rok narození na chess.cz ${m.birthYear}` });
     if (p.fide && m.fideId && p.fide !== m.fideId) out.push({ level: 'warn', text: `FIDE ID na chess.cz ${m.fideId}` });
     if (ctx.clubCode && m.clubId) {
@@ -315,12 +316,14 @@ export function playerIssues(p: CheckPlayer & { base?: number }, check: CzCheck 
     const pending = rows.find((r) => r.pending);
     if (ok) { /* confirmed */ }
     else if (p.guest_permit) { /* documented on paper */ }
-    else if (sameClub) out.push({ level: 'warn', text: `hostování potvrzeno pro jinou soutěž (${sameClub.comp})` });
-    else if (pending) out.push({ level: 'bad', strike: true, text: `hostování čeká na schválení (${pending.hostClubName}, ${pending.comp}; chybí: ${pending.pending})` });
+    // A permit may also come by e-mail (not in the registry) → missing confirmation is only a warning
+    // until the vedoucí confirms it manually; a permit for another club is a deficiency.
+    else if (sameClub) out.push({ level: 'warn', strike: true, text: `hostování potvrzeno pro jinou soutěž (${sameClub.comp})` });
+    else if (pending) out.push({ level: 'warn', strike: true, text: `hostování čeká na schválení (${pending.hostClubName}, ${pending.comp}; chybí: ${pending.pending})` });
     else if (rows.length) out.push({ level: 'bad', strike: true, text: `hostování potvrzeno jen pro ${rows.map((r) => `${r.hostClubName} (${r.comp})`).join(', ')}` });
-    else out.push({ level: 'bad', strike: true, text: 'chybí povolení hostování' });
+    else out.push({ level: 'warn', strike: true, text: 'chybí potvrzení hostování' });
   } else if (needsPermit && guest && !p.guest_permit && !check?.hosting) {
-    out.push({ level: 'bad', strike: true, text: 'chybí povolení hostování' });
+    out.push({ level: 'warn', strike: true, text: 'chybí potvrzení hostování' });
   }
 
   // Foreigner registration (registracecizincu.appchess.cz) or a document marked by the vedoucí.
@@ -331,11 +334,11 @@ export function playerIssues(p: CheckPlayer & { base?: number }, check: CzCheck 
     const pending = rows.find((r) => r.pending);
     if (ok || p.guest_permit) { /* confirmed */ }
     else if (sameClub) out.push({ level: 'warn', text: `registrace cizince potvrzena pro jinou soutěž (${sameClub.comp})` });
-    else if (pending) out.push({ level: 'bad', text: `registrace cizince čeká na schválení (chybí: ${pending.pending})` });
+    else if (pending) out.push({ level: 'warn', text: `registrace cizince čeká na schválení (chybí: ${pending.pending})` });
     else if (rows.length) out.push({ level: 'bad', text: `registrace cizince jen pro ${rows.map((r) => `${r.clubName} (${r.comp})`).join(', ')}` });
-    else out.push({ level: 'bad', text: 'chybí registrace cizince' });
+    else out.push({ level: 'warn', text: 'chybí potvrzení registrace cizince' });
   } else if (foreign && !p.guest_permit && !check?.foreigner) {
-    out.push({ level: 'bad', text: 'chybí doklad cizince' });
+    out.push({ level: 'warn', text: 'chybí potvrzení registrace cizince' });
   }
 
   // V = a player of the club who is in the starting line-up (Z) of the club's team in a higher competition.
@@ -369,9 +372,11 @@ export function strikeReason(issues: Issue[]): string {
 export function deficiencyReport(teams: { name: string; players: { name: string; struck?: number; issues: Issue[] }[] }[]): string {
   return teams
     .map((t) => {
+      // Deficiencies + everything that leads to striking (e.g. a missing hosting confirmation).
+      const relevant = (i: Issue) => i.level === 'bad' || i.strike;
       const lines = t.players
-        .filter((p) => !p.struck && p.issues.some((i) => i.level === 'bad'))
-        .map((p) => `- ${p.name}: ${p.issues.filter((i) => i.level === 'bad').map((i) => i.text).join('; ')}`);
+        .filter((p) => !p.struck && p.issues.some(relevant))
+        .map((p) => `- ${p.name}: ${p.issues.filter(relevant).map((i) => i.text).join('; ')}`);
       return lines.length ? `${t.name}\n${lines.join('\n')}` : '';
     })
     .filter(Boolean)

@@ -101,15 +101,14 @@ function tableColumns(g: Grid, r: number): Columns {
 
 const Z_YES = new Set(['ano', 'a', 'z', 'x', '1', '✓', '✔', 'yes', 'y']);
 
-/** "ano", "Ano", "z", "ANO, ml." … → Z = yes; other words of the cell are returned for a warning. */
-export function parseZCell(cell: string): { z: boolean; rest: string } {
-  const parts = cell.split(/[\s,;/]+/).filter(Boolean);
-  const isYes = (w: string) => Z_YES.has(fold(w).replace(/\.$/, ''));
-  const NO = new Set(['ne', 'n', '0', '-']);
-  return {
-    z: parts.some(isYes),
-    rest: parts.filter((w) => !isYes(w) && !NO.has(fold(w))).join(' '),
-  };
+/**
+ * The template asks for "ano", the sscr-soupiska generator writes "Z" (or empty). Anything else is interpreted tolerantly — any yes-word in the cell
+ * ("Ano", "z", "x", "ANO, ml." …) = Z — but reported as `unusual` so the vedoucí checks it.
+ */
+export function parseZCell(cell: string): { z: boolean; unusual: boolean } {
+  const text = cell.trim();
+  const parts = text.split(/[\s,;/]+/).filter(Boolean);
+  return { z: parts.some((w) => Z_YES.has(fold(w).replace(/\.$/, ''))), unusual: text !== '' && !['ano', 'z'].includes(fold(text)) };
 }
 
 export function parseRosterGrid(g: Grid): { draft: RosterDraft; warnings: string[] } {
@@ -136,7 +135,9 @@ export function parseRosterGrid(g: Grid): { draft: RosterDraft; warnings: string
     if (!name || /^(prijmeni|jmeno)/.test(fold(name))) continue;
     const flags = parseFlags(cols.ozn >= 0 ? cellAt(g, r, cols.ozn) : '');
     const zCell = parseZCell(cols.z >= 0 ? cellAt(g, r, cols.z) : '');
-    if (zCell.rest) warnings.push(`Sloupec Z u hráče ${name.trim()} obsahuje navíc „${zCell.rest}“ — zkontrolujte (např. ml./st. patří ke jménu).`);
+    if (zCell.unusual) {
+      warnings.push(`Sloupec Z u hráče ${name.trim()}: neobvyklá hodnota „${cellAt(g, r, cols.z).trim()}“ — bráno jako ${zCell.z ? 'Z' : 'bez Z'}, zkontrolujte.`);
+    }
     players.push({
       jmeno: name.replace(/\s+/g, ' '),
       rok: numOrBlank(cols.rok >= 0 ? cellAt(g, r, cols.rok) : ''),

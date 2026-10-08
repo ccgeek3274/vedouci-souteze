@@ -48,6 +48,15 @@ describe.skipIf(!existsSync(DIR))('e-soupiska xlsx import (real files)', () => {
     expect(draft.extra.pozadavkyLosovani).toBe('');
   });
 
+  it('notes in the Z column ("ano,ml.") still mean Z and are reported', async () => {
+    const { draft, warnings } = await parseFile('Soupiska Sokol Brandýs n.L.B.xlsx');
+    expect(draft.players.filter((p) => p.z)).toHaveLength(8);
+    expect(warnings.filter((w) => w.startsWith('Sloupec Z'))).toEqual([
+      'Sloupec Z u hráče Meca Viktor: neobvyklá hodnota „ano,ml.“ — bráno jako Z, zkontrolujte.',
+      'Sloupec Z u hráče Meca Viktor: neobvyklá hodnota „ano,st.“ — bráno jako Z, zkontrolujte.',
+    ]);
+  });
+
   it('older template variant (no FIDE column, shifted rows) via label anchors', async () => {
     const { draft, warnings } = await parseFile('Mšeno soupiska.xlsx');
     expect(draft.players).toHaveLength(15);

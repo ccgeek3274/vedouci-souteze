@@ -43,8 +43,17 @@ Worker: jedna cache položka na zdroj (TTL 1 h, při výpadku stará kopie), roz
 (`chesscz_rate` id 2). Klient dostane jen řádky sezóny soutěže.
 
 Párování: hostování = LOK + hostitelský oddíl = oddíl družstva + soutěž (`sameCompetition`: uvozovky, „SŠS“,
-„(bez určení skupiny)“ platí pro všechny skupiny úrovně). Jiná soutěž → upozornění, jiný oddíl / čeká na schválení /
-nic → nedostatek a návrh na vyškrtnutí (pokud není ručně doloženo). Cizinci obdobně (oddíl = oddíl družstva), bez vyškrtnutí.
+„(bez určení skupiny)“ platí pro všechny skupiny úrovně). Potvrzení lze poslat i ručně e-mailem (pak v registru není),
+proto: chybí / čeká na schválení / jen pro jinou soutěž → **upozornění** (u hostování s návrhem na vyškrtnutí), které
+zmizí po ručním zaškrtnutí „doloženo“; potvrzení jen pro **jiný oddíl** → **nedostatek**. Cizinci obdobně (oddíl =
+oddíl družstva), bez návrhu na vyškrtnutí.
+
+Rozhodnutí 8. 10. 2026:
+- Vyškrtnutí = příznak (hráč zůstává přeškrtnutý, lze vrátit); odebrání hráče jen ručně v editaci soupisky.
+- Jméno se musí shodovat s ID (LOK/FIDE) — neshoda = nedostatek (typicky překlep v ID). Rozlišení ml./st. se
+  dopočítá automaticky při generování úvodního zpravodaje (M8), na soupisce ho neevidujeme.
+- Sloupec Z: normální hodnoty jsou „ano“, „Z“ (generátor sscr-soupiska) a prázdno; cokoli jiného se tolerantně
+  vyhodnotí a nahlásí upozorněním při importu.
 
 ## Ukládání
 Snapshot (`CzCheck`: záznam chess.cz, řádky registrů, záznamy ve vyšších soutěžích) je u hráče
@@ -53,7 +62,8 @@ vyškrtnutím (párování LOK, bez LOK jméno). Změna LOK/FIDE snapshot zahod�
 
 ## Výstup
 - Nedostatky (✕) a upozornění (!) u hráčů; vyškrtnutí vždy ručně (jednotlivě / „Vyškrtnout navržené“), lze vrátit.
-- „Nedostatky pro předběžný zpravodaj“ = text po družstvech (`deficiencyReport`) — v M8 se vloží do zpravodaje.
+- „Nedostatky pro předběžný zpravodaj“ = text po družstvech (`deficiencyReport`): nedostatky + vše, co vede
+  k návrhu na vyškrtnutí — v M8 se vloží do zpravodaje.
 
 ## Ruční úprava soupisky
 Detail družstva → „Upravit soupisku“: jméno, rok, LOK, FIDE, označení (K/ZK, H/V/C), Z, pořadí, přidání / odebrání
@@ -62,4 +72,4 @@ hráče, „Nastavit Z podle pravidla“ (přeskočeným písmenkovým ponechá 
 
 ## Import: sloupec Z
 Buňka se rozdělí na slova; Z = kterékoli z „ano / a / z / x / 1 / ✓ / yes“ (bez ohledu na velikost, tečku).
-Ostatní slova (např. „ano,ml.“ — kapitán sem napsal rozlišení ml./st.) se nezahodí, ale vypíší jako varování importu.
+Každá hodnota jiná než „ano“ / „Z“ / prázdno (např. „ano,ml.“) se nahlásí jako varování importu.

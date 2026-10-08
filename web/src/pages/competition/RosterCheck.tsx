@@ -101,7 +101,7 @@ export function RosterCheck() {
 
       <div className="card">
         <div className="card-strip"><h2>Nedostatky pro předběžný zpravodaj</h2>
-          <span className="helper">Jen závažné nedostatky nevyškrtnutých hráčů.</span></div>
+          <span className="helper">Nedostatky a chybějící potvrzení nevyškrtnutých hráčů.</span></div>
         <div className="card-body">
           {report
             ? <textarea className="input mono" readOnly rows={Math.min(20, report.split('\n').length + 1)} style={{ width: '100%', fontSize: 12.5 }} value={report} />
