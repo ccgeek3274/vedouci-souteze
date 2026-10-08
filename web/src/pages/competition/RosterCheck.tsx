@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import { czDateTime } from '../../lib/format';
-import { checkTeamRoster, checkedAt, chessczGet, competitionIssues, prepareCheck } from '../../lib/rosterCheck';
+import { checkTeamRoster, checkedAt, chessczGet, competitionIssues, prepareCheck, runVCheck } from '../../lib/rosterCheck';
 import type { RosterCheckData, RosterPlayer } from '../../lib/types';
 import { asArray, deficiencyReport, strikeReason, type Issue } from '../../../../shared/roster/verify';
 import { sameCompetition, type RosterCheckSection } from '../../../../shared/registry';
@@ -35,7 +35,7 @@ export function RosterCheck() {
   const run = async (list: Team[]) => {
     setError(null);
     try {
-      const ctx = await prepareCheck(c, data.teams, (x) => setProgress(x));
+      const ctx = await prepareCheck(c, (x) => setProgress(x));
       setWarnings(ctx.warnings);
       for (const t of list) {
         setProgress(`${t.name}: 0/${t.players!.length}`);
@@ -80,8 +80,8 @@ export function RosterCheck() {
           <p className="helper-text">
             Před definitivním úvodním zpravodajem se vyškrtnou hráči bez registrace a hosté bez povolení hostování (rozpis).
             Z se kontroluje podle pravidla e-soupisky ({c.boards} hráčů, nejvýše {Math.max(0, Math.ceil(c.boards / 2) - 1)} písmenkoví H/V/C),
-            V podle základních sestav družstev oddílu ve vyšších soutěžích na chess.cz, hostování a cizinci podle registrů ŠSČR
-            (hostovani / registracecizincu.appchess.cz). Kontrola volá chess.cz postupně (~3 dotazy/s), u celé skupiny trvá 1–2 minuty.
+            hostování a cizinci podle registrů ŠSČR (hostovani / registracecizincu.appchess.cz). Označení V má samostatnou kontrolu níže.
+            Kontrola volá chess.cz postupně (~3 dotazy/s), u celé skupiny trvá asi minutu.
           </p>
           <div className="row">
             <button className="btn btn-primary" disabled={!!progress || !withRoster.length} onClick={() => run(withRoster)}>Ověřit všechny soupisky na chess.cz</button>
@@ -95,6 +95,7 @@ export function RosterCheck() {
       </div>
 
       {warnings.map((w) => <div key={w} className="note warn">{w}</div>)}
+      <VCheckCard competition={c} data={data} busy={!!progress} onDone={refresh} />
       <ChessczRosterCheck competition={c} teams={data.teams.map((t) => t.name)} />
 
       {data.teams.map((t) => <TeamCheck key={t.id} team={t} issues={issues} busy={!!progress} onCheck={() => run([t])} onChanged={refresh} />)}
@@ -212,6 +213,52 @@ function ChessczRosterCheck({ competition: c, teams }: { competition: Competitio
             </div>
           ))}
         {q.data && <p className="helper-text">Načteno {czDateTime(Math.floor(q.data.fetchedAt / 1000))} (obnovuje se po hodině).</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Separate, competition-wide and approximate check of the V letter (club teams in higher competitions found by name). */
+function VCheckCard({ competition: c, data, busy, onDone }: { competition: Competition; data: RosterCheckData; busy: boolean; onDone: () => Promise<unknown> }) {
+  const [progress, setProgress] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const players = data.teams.flatMap((t) => t.players ?? []);
+  const times = players.map((p) => p.v_checked_at).filter((x): x is number => !!x);
+  const run = async () => {
+    setMsg(null);
+    try {
+      const found = await runVCheck(c, data, setProgress);
+      setMsg(found ? null : 'Ve vyšších soutěžích nebylo nalezeno žádné družstvo oddílů této soutěže.');
+    } catch (e) {
+      setMsg(apiErrorText(e));
+    } finally {
+      setProgress(null);
+      await onDone();
+    }
+  };
+  return (
+    <div className="card">
+      <div className="card-strip"><h2>Kontrola označení V</h2>
+        <span className="helper">{times.length ? `naposledy ${czDateTime(Math.min(...times))}` : 'zatím neprovedena'}</span>
+        <span className="spacer" />
+        {progress && <span className="muted mono">{progress}</span>}
+        <button className="btn btn-small" style={{ whiteSpace: 'nowrap' }} disabled={busy || !!progress || !players.length} onClick={run}>Ověřit V v celé soutěži</button>
+      </div>
+      <div className="card-body">
+        <p className="helper-text" style={{ marginTop: 0 }}>
+          V = hráč mateřského oddílu, který je v základní sestavě (Z) družstva oddílu ve vyšší soutěži. Družstva oddílu se ve vyšších
+          soutěžích na chess.cz hledají podle názvu, takže kontrola <b>není dokonalá</b>: družstvo s jiným názvem se nenajde
+          a před nahráním soupisek vyšších soutěží do chess.cz hlásí falešné chyby. Má smysl hlavně před definitivním zpravodajem.
+        </p>
+        {msg && <div className="note warn">{msg}</div>}
+        {times.length > 0 && (
+          <ul className="list-plain">
+            {data.teams.filter((t) => t.players?.length).map((t) => {
+              const found = t.players!.find((p) => p.v)?.v?.higherTeams ?? [];
+              return <li key={t.id}><b>{t.name}</b>: {found.length ? found.join(', ') : <span className="muted">žádné družstvo ve vyšší soutěži</span>}</li>;
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );

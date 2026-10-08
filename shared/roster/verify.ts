@@ -30,11 +30,13 @@ export type CzCheck = {
   /** Registry rows of the player (by LOK; pending hosting rows by name). Undefined = registries not loaded. */
   hosting?: HostingRow[];
   foreigner?: ForeignerRow[];
-  /** Entries on rosters of higher competitions; undefined = not loaded. */
-  higher?: HigherEntry[];
-  /** Teams of the team's club found in higher competitions (context for the V check). */
-  higherTeams?: string[];
 };
+
+/**
+ * Result of the separate V check (competition-wide button): the player's entries on rosters of higher
+ * competitions and the teams of the club found there. Approximate — the club's teams are found by name.
+ */
+export type VCheck = { higher: HigherEntry[]; higherTeams: string[] };
 
 export type HigherEntry = { compId: number; comp: string; team: string; z: boolean; h: boolean };
 
@@ -262,6 +264,8 @@ export type IssueContext = {
   expectedZ?: ExpectedZ | null;
   /** Size of the starting line-up (number of boards) — for the explanation of the Z rule. */
   base?: number;
+  /** Result of the V check; null/undefined = not run. */
+  v?: VCheck | null;
 };
 
 export const describeMember = (m: CzMember) =>
@@ -342,12 +346,13 @@ export function playerIssues(p: CheckPlayer & { base?: number }, check: CzCheck 
   }
 
   // V = a player of the club who is in the starting line-up (Z) of the club's team in a higher competition.
-  if (check?.higher) {
-    const inZ = check.higher.filter((e) => e.z && !e.h);
+  const v = ctx.v;
+  if (v) {
+    const inZ = v.higher.filter((e) => e.z && !e.h);
     if (free && !inZ.length) {
       out.push({
-        level: check.higherTeams?.length ? 'bad' : 'warn',
-        text: check.higherTeams?.length ? 'označen V, ale není v základní sestavě vyšší soutěže'
+        level: v.higherTeams.length ? 'bad' : 'warn',
+        text: v.higherTeams.length ? 'označen V, ale není v základní sestavě vyšší soutěže'
           : 'označen V, ale družstvo oddílu ve vyšší soutěži nebylo nalezeno',
       });
     }

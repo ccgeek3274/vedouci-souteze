@@ -65,7 +65,7 @@ export function TeamDetail() {
   const verify = async () => {
     setCheckError(null);
     try {
-      const ctx = await prepareCheck(comp.competition, comp.teams.filter((x) => x.status === 'active'), setProgress);
+      const ctx = await prepareCheck(comp.competition, setProgress);
       const r = await checkTeamRoster(t, data.roster!.players, ctx, (d, n) => setProgress(`${d}/${n}`));
       const problems = [...ctx.warnings, ...(r.error ? [`${r.error} — ověřeno jen částečně.`] : [])];
       if (problems.length) setCheckError(problems.join(' '));

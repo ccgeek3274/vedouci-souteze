@@ -24,7 +24,12 @@ běh v prohlížeči `web/src/lib/rosterCheck.ts`, registry ve Workeru `worker/l
 - Hráči: `/clubs/{code}/members` hromadně (oddíl družstva = zadaný, jinak většinový oddíl ne-hostujících hráčů,
   uloží se k družstvu), zbytek `/members/{lok}/cze`, `/members/{fide}/fide`, bez ID hledání podle jména
   (jediný kandidát → „Doplnit LOK“). Nenalezený hráč = `200 []`.
-- Vyšší soutěže (pro V): `/competitions/{rok}` → soutěže dospělých ŠSČR (98) a kraje s `compLevel` menším než naše
+- Vyšší soutěže (pro V) — **samostatné tlačítko „Ověřit V v celé soutěži“** (rozhodnutí 8. 10. 2026: oddělit od
+  běžné kontroly, jen na úrovni soutěže, přijímáme, že není dokonalá; výsledek v `roster_players.v_json`, `v_checked_at`,
+  běžná kontrola ho nepřepisuje, při nové verzi soupisky se přenáší, změna LOK ho zahodí). Známá slabá místa:
+  družstvo oddílu s úplně jiným názvem se nenajde (chybějící V se pak neodhalí); falešné shody názvů (DDM / TJ, AŠ /
+  Sokol) nevadí, rozhoduje LOK + Z bez H; před nahráním soupisek vyšších soutěží do chess.cz hlásí falešné chyby.
+  Postup: `/competitions/{rok}` → soutěže dospělých ŠSČR (98) a kraje s `compLevel` menším než naše
   (KP 3, KS 4, RP 5, RS 6) → `/table` → soupisky (`/team/{id}/roster`, `playerId` = LOK, `playerFlags` „ H Z“) jen
   u družstev, jejichž název (bez písmene) odpovídá našemu družstvu/oddílu. O V rozhoduje LOK + Z bez H.
   Pro RPB ~12 tabulek + soupisky družstev dotčených oddílů; vše v cache 1 h.

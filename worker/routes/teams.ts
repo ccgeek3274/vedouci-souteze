@@ -28,7 +28,7 @@ teams.get('/teams/:teamId', async (c) => {
   const chosen = (versions.results as any[]).find((v) => String(v.version) === version) ?? versions.results[0];
   const players = chosen
     ? (await db.prepare('SELECT * FROM roster_players WHERE roster_version_id = ? ORDER BY position').bind((chosen as any).id).all<any>()).results
-      .map(({ cz_json, ...p }) => ({ ...p, cz: cz_json ? JSON.parse(cz_json) : null }))
+      .map(({ cz_json, v_json, ...p }) => ({ ...p, cz: cz_json ? JSON.parse(cz_json) : null, v: v_json ? JSON.parse(v_json) : null }))
     : [];
   return c.json({ team, contacts: contacts.results, versions: versions.results, roster: chosen ? { ...(chosen as object), players } : null });
 });
@@ -94,7 +94,7 @@ teams.patch('/roster-players/:playerId', async (c) => {
   const keys = Object.keys(f);
   if (!keys.length) return c.json({ error: 'Nic ke změně' }, 400);
   // A changed id makes the stored chess.cz check obsolete.
-  const reset = 'lok' in f || 'fide' in f ? ', cz_json = NULL, cz_checked_at = NULL' : '';
+  const reset = 'lok' in f || 'fide' in f ? ', cz_json = NULL, cz_checked_at = NULL, v_json = NULL, v_checked_at = NULL' : '';
   await c.env.DB.prepare(`UPDATE roster_players SET ${keys.map((k) => `${k} = ?`).join(', ')}${reset} WHERE id = ?`)
     .bind(...keys.map((k) => (f as any)[k]), c.req.param('playerId')).run();
   return c.json({ ok: true });
@@ -121,10 +121,29 @@ teams.get('/competitions/:id/roster-check', async (c) => {
   ]);
   const byTeam = new Map<string, any[]>();
   for (const p of players.results as any[]) {
-    const { cz_json, team_id, ...rest } = p;
-    byTeam.set(team_id, [...(byTeam.get(team_id) ?? []), { ...rest, cz: cz_json ? JSON.parse(cz_json) : null }]);
+    const { cz_json, v_json, team_id, ...rest } = p;
+    byTeam.set(team_id, [...(byTeam.get(team_id) ?? []), { ...rest, cz: cz_json ? JSON.parse(cz_json) : null, v: v_json ? JSON.parse(v_json) : null }]);
   }
   return c.json({ teams: (teamRows.results as any[]).map((t) => ({ ...t, players: byTeam.get(t.id) ?? null })) });
+});
+
+/** Save the competition-wide V check: { players: [{ id, v }] } (current rosters of the competition only). */
+teams.put('/competitions/:id/v-check', async (c) => {
+  const comp = await ownedCompetition(c, c.req.param('id'));
+  if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
+  const body = await c.req.json<{ players?: { id: number; v: unknown }[] }>().catch(() => null);
+  if (!Array.isArray(body?.players)) return c.json({ error: 'Chybí výsledky kontroly' }, 400);
+  const { results: own } = await c.env.DB.prepare(
+    `SELECT rp.id FROM roster_players rp JOIN roster_versions rv ON rv.id = rp.roster_version_id JOIN teams t ON t.id = rv.team_id
+     WHERE t.competition_id = ? AND ${CURRENT_VERSION_SQL}`
+  ).bind(comp.id).all<{ id: number }>();
+  const ids = new Set(own.map((r) => r.id));
+  const t = now();
+  const stmts = body!.players
+    .filter((p) => ids.has(p.id) && p.v && JSON.stringify(p.v).length <= 8000)
+    .map((p) => c.env.DB.prepare('UPDATE roster_players SET v_json = ?, v_checked_at = ? WHERE id = ?').bind(JSON.stringify(p.v), t, p.id));
+  for (let i = 0; i < stmts.length; i += 50) await c.env.DB.batch(stmts.slice(i, i + 50));
+  return c.json({ ok: true, saved: stmts.length });
 });
 
 /** Save the result of a roster check: { club_code?, club_name?, players: [{ id, cz }] } (current version only). */

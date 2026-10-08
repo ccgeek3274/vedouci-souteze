@@ -95,11 +95,13 @@ describe('playerIssues', () => {
 
   it('checks V against the starting line-ups of higher competitions', () => {
     const kp = { compId: 1, comp: 'Krajský přebor SŠS', team: 'Jawa Brodce A', z: true, h: false };
-    expect(playerIssues(player({}), found({}, { higher: [kp], higherTeams: ['Jawa Brodce A'] }), ctx)[0].text).toMatch(/chybí označení V$/);
-    expect(playerIssues(player({ flags: 'V' }), found({}, { higher: [kp], higherTeams: ['Jawa Brodce A'] }), ctx)).toEqual([]);
-    expect(playerIssues(player({ flags: 'V' }), found({}, { higher: [{ ...kp, z: false }], higherTeams: ['Jawa Brodce A'] }), ctx).map((i) => [i.level, i.text]))
+    const v = (higher: typeof kp[], higherTeams = ['Jawa Brodce A']) => ({ ...ctx, v: { higher, higherTeams } });
+    expect(playerIssues(player({}), found({}), v([kp]))[0].text).toMatch(/chybí označení V$/);
+    expect(playerIssues(player({ flags: 'V' }), found({}), v([kp]))).toEqual([]);
+    expect(playerIssues(player({ flags: 'V' }), found({}), v([{ ...kp, z: false }])).map((i) => [i.level, i.text]))
       .toEqual([['bad', 'označen V, ale není v základní sestavě vyšší soutěže']]);
-    expect(playerIssues(player({ flags: 'V' }), found({}, { higher: [], higherTeams: [] }), ctx).map((i) => i.level)).toEqual(['warn']);
+    expect(playerIssues(player({ flags: 'V' }), found({}), v([], [])).map((i) => i.level)).toEqual(['warn']);
+    expect(playerIssues(player({ flags: 'V' }), found({}), ctx)).toEqual([]);
   });
 
   it('checks Z against the expected line-up', () => {
