@@ -3,9 +3,12 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import { czDateTime } from '../../lib/format';
-import { checkTeamRoster, checkedAt, competitionIssues } from '../../lib/rosterCheck';
+import { checkTeamRoster, checkedAt, chessczGet, competitionIssues, prepareCheck } from '../../lib/rosterCheck';
 import type { RosterCheckData, RosterPlayer } from '../../lib/types';
-import { deficiencyReport, strikeReason, type Issue } from '../../../../shared/roster/verify';
+import { asArray, deficiencyReport, strikeReason, type Issue } from '../../../../shared/roster/verify';
+import { sameCompetition, type RosterCheckSection } from '../../../../shared/registry';
+import { fold } from '../../../../shared/text';
+import type { Competition } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 
 type Team = RosterCheckData['teams'][number];
@@ -22,18 +25,21 @@ export function RosterCheck() {
   const { data, isLoading } = useRosterCheck(c.id);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const refresh = () => Promise.all([queryClient.invalidateQueries({ queryKey: ['roster-check', c.id] }), queryClient.invalidateQueries({ queryKey: ['team'] })]);
 
   if (isLoading || !data) return <p style={{ color: 'var(--cream)' }}>Načítání…</p>;
-  const issues = competitionIssues(data);
+  const issues = competitionIssues(data, c);
   const withRoster = data.teams.filter((t) => t.players?.length);
 
   const run = async (list: Team[]) => {
     setError(null);
     try {
+      const ctx = await prepareCheck(c, data.teams, (x) => setProgress(x));
+      setWarnings(ctx.warnings);
       for (const t of list) {
         setProgress(`${t.name}: 0/${t.players!.length}`);
-        const r = await checkTeamRoster(t, t.players!, (d, n) => setProgress(`${t.name}: ${d}/${n}`));
+        const r = await checkTeamRoster(t, t.players!, ctx, (d, n) => setProgress(`${t.name}: ${d}/${n}`));
         if (r.error) throw new Error(`${t.name}: ${r.error} — ověřeno jen částečně, zkuste to později znovu.`);
       }
     } catch (e) {
@@ -63,7 +69,7 @@ export function RosterCheck() {
       {error && <div className="alert">{error}</div>}
       <div className="card">
         <div className="card-strip"><h2>Kontrola soupisek</h2>
-          <span className="helper">Registrace, příspěvek {data.feeYear}, oddíl a hostování, údaje hráčů, duplicity.</span></div>
+          <span className="helper">Registrace, označení Z / H / V / C, potvrzená hostování a registrace cizinců.</span></div>
         <div className="card-body">
           <p style={{ marginTop: 0 }}>
             {withRoster.length} soupisek · {all.length} hráčů
@@ -72,8 +78,10 @@ export function RosterCheck() {
             {toStrike > 0 && <> · <span className="tag bad">{toStrike} navrženo k vyškrtnutí</span></>}
           </p>
           <p className="helper-text">
-            Před definitivním úvodním zpravodajem se vyškrtnou hráči bez registrace, bez zaplaceného příspěvku a hosté bez povolení hostování (rozpis).
-            Kontrola volá chess.cz postupně (~3 dotazy/s), u celé skupiny trvá zhruba minutu.
+            Před definitivním úvodním zpravodajem se vyškrtnou hráči bez registrace a hosté bez povolení hostování (rozpis).
+            Z se kontroluje podle pravidla e-soupisky ({c.boards} hráčů, nejvýše {Math.max(0, Math.ceil(c.boards / 2) - 1)} písmenkoví H/V/C),
+            V podle základních sestav družstev oddílu ve vyšších soutěžích na chess.cz, hostování a cizinci podle registrů ŠSČR
+            (hostovani / registracecizincu.appchess.cz). Kontrola volá chess.cz postupně (~3 dotazy/s), u celé skupiny trvá 1–2 minuty.
           </p>
           <div className="row">
             <button className="btn btn-primary" disabled={!!progress || !withRoster.length} onClick={() => run(withRoster)}>Ověřit všechny soupisky na chess.cz</button>
@@ -85,6 +93,9 @@ export function RosterCheck() {
           </div>
         </div>
       </div>
+
+      {warnings.map((w) => <div key={w} className="note warn">{w}</div>)}
+      <ChessczRosterCheck competition={c} teams={data.teams.map((t) => t.name)} />
 
       {data.teams.map((t) => <TeamCheck key={t.id} team={t} issues={issues} busy={!!progress} onCheck={() => run([t])} onChanged={refresh} />)}
 
@@ -164,5 +175,44 @@ function IssueRow({ player: p, issues, onChanged }: { player: RosterPlayer; issu
           : reason && <button className="btn btn-small" onClick={() => patch({ struck: 1, struck_reason: reason })}>Vyškrtnout</button>}
       </td>
     </tr>
+  );
+}
+
+type Regions = Record<string, { regionCode: string; regionName: string }>;
+
+/** chess.cz/kontrola-soupisek for our svaz, filtered to our competition (useful right before the definitive bulletin). */
+function ChessczRosterCheck({ competition: c, teams }: { competition: Competition; teams: string[] }) {
+  const q = useQuery({
+    queryKey: ['chesscz-roster-check', c.season, c.region],
+    queryFn: async () => {
+      const regions = (await chessczGet(`/competitions/${parseInt(c.season, 10)}`)) as Regions | null;
+      const org = Object.entries(regions ?? {}).find(([, r]) => fold(r.regionName) === fold(c.region) || fold(c.region).includes(fold(r.regionCode)))?.[0];
+      if (!org) return null;
+      return api.get<{ data: RosterCheckSection[]; fetchedAt: number }>(`/registry/roster-check?org=${org}`);
+    },
+  });
+  const sections = asArray(q.data?.data).map((s) => ({
+    ...s,
+    rows: s.rows.filter((r) => (c.chesscz_comp_id ? r.compId === c.chesscz_comp_id : sameCompetition(r.comp, c.name)) || teams.some((t) => fold(t) === fold(r.team))),
+  }));
+  return (
+    <div className="card">
+      <div className="card-strip"><h2>Kontrola soupisek na chess.cz</h2>
+        <span className="helper">Stránka chess.cz/kontrola-soupisek (registrace, hráči na více soupiskách) — má smysl až po nahrání soupisek do chess.cz.</span></div>
+      <div className="card-body">
+        {q.isLoading ? <p className="muted" style={{ margin: 0 }}>Načítání…</p>
+          : q.error ? <p className="muted" style={{ margin: 0 }}>{apiErrorText(q.error)}</p>
+          : !sections.length ? <p className="muted" style={{ margin: 0 }}>Na stránce nejsou žádné sekce.</p>
+          : sections.map((s) => (
+            <div key={s.title}>
+              <div className="section-title">{s.title}</div>
+              {s.rows.length
+                ? <ul className="list-plain">{s.rows.map((r) => <li key={`${r.lok}-${r.team}`}>{r.name} {r.lok && <span className="muted mono">LOK {r.lok}</span>} — {r.team}</li>)}</ul>
+                : <p className="muted" style={{ margin: 0 }}>V této soutěži nikdo.</p>}
+            </div>
+          ))}
+        {q.data && <p className="helper-text">Načteno {czDateTime(Math.floor(q.data.fetchedAt / 1000))} (obnovuje se po hodině).</p>}
+      </div>
+    </div>
   );
 }

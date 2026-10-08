@@ -32,8 +32,6 @@ export type RosterPlayer = {
   cz: CzCheck | null; cz_checked_at: number | null;
 };
 export type RosterCheckData = {
-  feeYear: number;
   teams: { id: string; name: string; club_name: string; club_code: string | null; players: RosterPlayer[] | null }[];
-  elsewhere: Record<string, string[]>;
 };
 export type RosterVersion = { id: string; version: number; source: string; filename: string; base_count: number; created_at: number };

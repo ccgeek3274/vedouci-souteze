@@ -1,47 +1,53 @@
-# Kontrola soupisek proti chess.cz (M6)
+# Kontrola soupisek (M6)
 
 Záložka **Kontrola soupisek** + sloupec „Kontrola chess.cz“ v detailu družstva.
-Logika: `shared/roster/verify.ts` (testy `shared/__tests__/verify.test.ts`), běh v prohlížeči `web/src/lib/rosterCheck.ts`.
+Logika: `shared/roster/verify.ts`, parsery registrů `shared/registry.ts` (testy `shared/__tests__/verify.test.ts`),
+běh v prohlížeči `web/src/lib/rosterCheck.ts`, registry ve Workeru `worker/lib/registry.ts` + `routes/registry.ts`.
 
-## Proč v prohlížeči
-Dotazy na chess.cz jdou postupně přes Worker proxy (rate gate ~3 req/s, cache 24 h). Klient řídí průběh
-(zobrazuje „družstvo: 5/18“) a výsledek uloží `PUT /teams/:id/roster-check`. Worker tak nenaráží na limity
-subrequestů / D1 dotazů na jednu invokaci a celá skupina (~140 hráčů) trvá zhruba minutu.
+## Rozhodnutí (vedoucí, 8. 10. 2026)
+- **Příspěvky se nekontrolují.** Rozhoduje jen registrace na chess.cz: „Aktivní“ (u cizinců „Cizinec“), jinak návrh na vyškrtnutí.
+- **Duplicity se nekontrolují** (hráč smí být až na třech soupiskách). Řeší je chess.cz/kontrola-soupisek
+  (hráči bez registrace, na více než třech soupiskách) — aplikace stránku jen přebírá a filtruje na soutěž;
+  smysl má až těsně před definitivním zpravodajem (po nahrání soupisek do chess.cz).
+- **Kontrolují se označení** (soupiska může obsahovat chybu):
+  - **Z** podle pravidla e-soupisky (sscr-soupiska `recalcZaklad`): prvních N hráčů (N = počet šachovnic),
+    písmenkových H/V/C v Z nejvýše ceil(N/2)−1 (8 → 3, 5 → 2), další písmenkový se přeskočí; vyškrtnutí se nepočítají.
+  - **C** = na profilu chess.cz registrace „Cizinec“ (obousměrně).
+  - **H** = host: hráč jiného oddílu než družstvo (obousměrně).
+  - **V** = volný: hráč mateřského oddílu, který je v základní sestavě (Z) družstva oddílu ve vyšší soutěži (obousměrně).
+- **Potvrzené hostování / registrace cizince** podle registrů ŠSČR; ruční „doloženo“ zůstává pro papírové doklady.
 
-## Vyhledání (port `enrichRosterPlayers` ze sscr-soupiska)
-- Známé č. oddílu družstva (`teams.club_code`) → jeden `/clubs/{code}/members` pokryje většinu hráčů.
-- Neznámé → kotva = první ne-hostující hráč s LOK, jeho aktuální oddíl se stáhne hromadně (max 2 oddíly);
-  oddíl družstva = většinový oddíl ne-hostujících hráčů (H/C se nepočítají) a uloží se k družstvu (lze opravit v detailu).
-- Zbytek po jednom: LOK → `/members/{lok}/cze`, jinak FIDE → `/members/{fide}/fide`, jinak hledání podle jména
-  (kandidáti se shodným jménem; jediný kandidát → tlačítko „Doplnit LOK“).
-- Nenalezený hráč vrací chess.cz jako `200 []`.
-- Výpadek chess.cz → částečný výsledek se uloží, chyba se zobrazí.
+## chess.cz (Worker proxy, ~3 req/s, cache)
+- Hráči: `/clubs/{code}/members` hromadně (oddíl družstva = zadaný, jinak většinový oddíl ne-hostujících hráčů,
+  uloží se k družstvu), zbytek `/members/{lok}/cze`, `/members/{fide}/fide`, bez ID hledání podle jména
+  (jediný kandidát → „Doplnit LOK“). Nenalezený hráč = `200 []`.
+- Vyšší soutěže (pro V): `/competitions/{rok}` → soutěže dospělých ŠSČR (98) a kraje s `compLevel` menším než naše
+  (KP 3, KS 4, RP 5, RS 6) → `/table` → soupisky (`/team/{id}/roster`, `playerId` = LOK, `playerFlags` „ H Z“) jen
+  u družstev, jejichž název (bez písmene) odpovídá našemu družstvu/oddílu. O V rozhoduje LOK + Z bez H.
+  Pro RPB ~12 tabulek + soupisky družstev dotčených oddílů; vše v cache 1 h.
 
-Snapshot záznamu (`CzCheck`) se ukládá k hráči (`roster_players.cz_json`, `cz_checked_at`) a při importu nové
-verze soupisky se přenáší spolu s „doloženo“ a vyškrtnutím (párování podle LOK, bez LOK podle jména).
-Změna LOK/FIDE hráče snapshot zahodí.
-
-## Kontroly (`playerIssues`)
-| Závažnost | Kontrola | Návrh vyškrtnutí |
+## Registry bez API (nedokumentované, opatrně)
+| Zdroj | URL | Formát |
 |---|---|---|
-| ✕ | registrace ≠ „Aktivní“ (výjimka: „Cizinec“ u hráče s C; bez C jen upozornění) | ano |
-| ✕ | `feeYear` < rok začátku sezóny (2026/2027 → 2026) | ano |
-| ✕ | hráč jiného oddílu bez označení H/C | ano, pokud není doloženo |
-| ✕ | H bez doloženého povolení hostování | ano |
-| ✕ | C bez dokladu cizince | ne |
-| ✕ | chybí LOK / LOK nenalezen | ne |
-| ✕ | stejný LOK na jiné soupisce téže soutěže | ne |
-| ! | jméno, rok narození, FIDE ID se liší od chess.cz; H u člena vlastního oddílu | ne |
-| ! | stejný LOK na soupisce v jiné soutěži uživatele téže sezóny | ne |
+| hostování potvrzená | `hostovani.appchess.cz/exportCsvConfirmed/actual` | CSV `;`, cp1250, s LOK a kódy oddílů |
+| hostování nepotvrzená | `hostovani.appchess.cz/unconfirmed` | HTML tabulka, bez LOK (párování jménem) |
+| cizinci potvrzení | `registracecizincu.appchess.cz/exportCsvConfirmed/actual` | CSV `;`, cp1250, LOK/FIDE, kód oddílu |
+| cizinci nepotvrzení | `registracecizincu.appchess.cz/unconfirmed` | HTML tabulka s LOK/FIDE |
+| kontrola soupisek | `www.chess.cz/kontrola-soupisek/?poradatel=12` | HTML, sekce `<h4>` + tabulka, LOK v odkazu `/hrac/{lok}` |
 
-Porovnání jmen ignoruje pořadí slov, diakritiku a přípony ml./st./jr./sr.
+`/confirmed` (HTML ~1 MB) se nepoužívá, CSV je menší a nese ID. JSON API neexistuje (`.json`, `/api/…` → 404).
+Worker: jedna cache položka na zdroj (TTL 1 h, při výpadku stará kopie), rozestup ≥ 1,5 s mezi staženími
+(`chesscz_rate` id 2). Klient dostane jen řádky sezóny soutěže.
 
-Rozpis: před definitivním zpravodajem se vyškrtnou hráči bez registrace, bez zaplaceného příspěvku a hosté bez
-povolení hostování. Vyškrtnutí je vždy ruční (po jednom, nebo „Vyškrtnout navržené“ s potvrzením) a lze ho vrátit.
+Párování: hostování = LOK + hostitelský oddíl = oddíl družstva + soutěž (`sameCompetition`: uvozovky, „SŠS“,
+„(bez určení skupiny)“ platí pro všechny skupiny úrovně). Jiná soutěž → upozornění, jiný oddíl / čeká na schválení /
+nic → nedostatek a návrh na vyškrtnutí (pokud není ručně doloženo). Cizinci obdobně (oddíl = oddíl družstva), bez vyškrtnutí.
+
+## Ukládání
+Snapshot (`CzCheck`: záznam chess.cz, řádky registrů, záznamy ve vyšších soutěžích) je u hráče
+(`roster_players.cz_json`, `cz_checked_at`), při importu nové verze soupisky se přenáší spolu s „doloženo“ a
+vyškrtnutím (párování LOK, bez LOK jméno). Změna LOK/FIDE snapshot zahodí. Z se počítá vždy z aktuální soupisky.
 
 ## Výstup
-„Nedostatky pro předběžný zpravodaj“ = text po družstvech (`deficiencyReport`), jen závažné nedostatky nevyškrtnutých
-hráčů. V M8 se použije přímo v úvodním zpravodaji.
-
-## Otevřené
-- Požadovaný rok příspěvku = rok začátku sezóny (předpoklad, k potvrzení).
+- Nedostatky (✕) a upozornění (!) u hráčů; vyškrtnutí vždy ručně (jednotlivě / „Vyškrtnout navržené“), lze vrátit.
+- „Nedostatky pro předběžný zpravodaj“ = text po družstvech (`deficiencyReport`) — v M8 se vloží do zpravodaje.

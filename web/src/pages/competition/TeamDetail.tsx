@@ -8,7 +8,7 @@ import { parseContactPaste } from '../../../../shared/contacts';
 import type { Contact, RosterPlayer, RosterVersion, Team } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 import { IssueList, useRosterCheck } from './RosterCheck';
-import { checkTeamRoster, checkedAt, competitionIssues } from '../../lib/rosterCheck';
+import { checkTeamRoster, checkedAt, competitionIssues, prepareCheck } from '../../lib/rosterCheck';
 import { strikeReason } from '../../../../shared/roster/verify';
 
 type TeamResponse = {
@@ -58,13 +58,15 @@ export function TeamDetail() {
   if (isLoading || !data) return <p style={{ color: 'var(--cream)' }}>Načítání…</p>;
   const t = data.team;
   const latest = !!data.roster && data.roster.version === data.versions[0]?.version;
-  const issues = latest && check.data ? competitionIssues(check.data) : null;
+  const issues = latest && check.data ? competitionIssues(check.data, comp.competition) : null;
   const at = data.roster ? checkedAt(data.roster.players) : null;
   const verify = async () => {
     setCheckError(null);
     try {
-      const r = await checkTeamRoster(t, data.roster!.players, (d, n) => setProgress(`${d}/${n}`));
-      if (r.error) setCheckError(`${r.error} — ověřeno jen částečně.`);
+      const ctx = await prepareCheck(comp.competition, comp.teams.filter((x) => x.status === 'active'), setProgress);
+      const r = await checkTeamRoster(t, data.roster!.players, ctx, (d, n) => setProgress(`${d}/${n}`));
+      const problems = [...ctx.warnings, ...(r.error ? [`${r.error} — ověřeno jen částečně.`] : [])];
+      if (problems.length) setCheckError(problems.join(' '));
     } catch (e) {
       setCheckError(apiErrorText(e));
     } finally {
@@ -102,7 +104,7 @@ export function TeamDetail() {
               {checkError && <div className="alert">{checkError}</div>}
               {data.roster.filename && <p className="helper-text" style={{ marginTop: 0 }}>Zdroj: {data.roster.filename}</p>}
               <table className="table">
-                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th><th title="H — povolení hostování, C — doklad cizince">Doloženo</th>{issues && <><th>Kontrola chess.cz</th><th /></>}</tr></thead>
+                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th><th title="Ruční potvrzení dokladu (např. papírové povolení předložené na losovací schůzi). Potvrzená hostování a registrace cizinců z registrů ŠSČR se kontrolují automaticky.">Doloženo ručně</th>{issues && <><th>Kontrola chess.cz</th><th /></>}</tr></thead>
                 <tbody>
                   {data.roster.players.map((p) => (
                     <tr key={p.id} className={p.struck ? 'struck' : undefined}>

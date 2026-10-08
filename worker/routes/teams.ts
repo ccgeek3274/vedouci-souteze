@@ -6,7 +6,6 @@ import { TEAM_FIELDS, TEAM_NUMERIC } from './competitions';
 import { normalizeDraft } from '../../shared/roster/draft';
 import { bestTeamMatch, teamNameScore } from '../../shared/text';
 import { normTime, parseStartTime, shortTime, type StartSide } from '../../shared/startTime';
-import { requiredFeeYear } from '../../shared/roster/verify';
 import type { AppEnv } from '../types';
 
 const teams = new Hono<AppEnv>();
@@ -107,37 +106,25 @@ teams.patch('/roster-players/:playerId', async (c) => {
 
 const CURRENT_VERSION_SQL = 'rv.version = (SELECT MAX(version) FROM roster_versions x WHERE x.team_id = rv.team_id)';
 
-/** Current rosters of all active teams + where else (user's other competitions of the season) their players are. */
+/** Current rosters of all active teams (with the stored chess.cz snapshots). */
 teams.get('/competitions/:id/roster-check', async (c) => {
   const comp = await ownedCompetition(c, c.req.param('id'));
   if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
   const db = c.env.DB;
-  const [teamRows, players, elsewhere] = await db.batch([
+  const [teamRows, players] = await db.batch([
     db.prepare(`SELECT id, name, club_name, club_code FROM teams WHERE competition_id = ? AND status = 'active' ORDER BY position`).bind(comp.id),
     db.prepare(
       `SELECT rp.*, rv.team_id, rv.version FROM roster_players rp
        JOIN roster_versions rv ON rv.id = rp.roster_version_id JOIN teams t ON t.id = rv.team_id
        WHERE t.competition_id = ? AND t.status = 'active' AND ${CURRENT_VERSION_SQL} ORDER BY rp.position`
     ).bind(comp.id),
-    db.prepare(
-      `SELECT rp.lok, co.short, t.name FROM roster_players rp
-       JOIN roster_versions rv ON rv.id = rp.roster_version_id JOIN teams t ON t.id = rv.team_id
-       JOIN competitions co ON co.id = t.competition_id
-       WHERE co.owner_id = ? AND co.season = ? AND co.id != ? AND t.status = 'active' AND rp.lok IS NOT NULL AND ${CURRENT_VERSION_SQL}`
-    ).bind(c.get('user').id, comp.season, comp.id),
   ]);
   const byTeam = new Map<string, any[]>();
   for (const p of players.results as any[]) {
     const { cz_json, team_id, ...rest } = p;
     byTeam.set(team_id, [...(byTeam.get(team_id) ?? []), { ...rest, cz: cz_json ? JSON.parse(cz_json) : null }]);
   }
-  const other: Record<string, string[]> = {};
-  for (const r of elsewhere.results as any[]) (other[r.lok] ??= []).push(`${r.short} · ${r.name}`);
-  return c.json({
-    feeYear: requiredFeeYear(comp.season),
-    teams: (teamRows.results as any[]).map((t) => ({ ...t, players: byTeam.get(t.id) ?? null })),
-    elsewhere: other,
-  });
+  return c.json({ teams: (teamRows.results as any[]).map((t) => ({ ...t, players: byTeam.get(t.id) ?? null })) });
 });
 
 /** Save the result of a roster check: { club_code?, club_name?, players: [{ id, cz }] } (current version only). */
@@ -155,7 +142,7 @@ teams.put('/teams/:teamId/roster-check', async (c) => {
   const stmts: D1PreparedStatement[] = [];
   for (const p of body!.players) {
     const json = JSON.stringify(p.cz ?? null);
-    if (!ids.has(p.id) || !p.cz || json.length > 8000) continue;
+    if (!ids.has(p.id) || !p.cz || json.length > 16000) continue;
     stmts.push(c.env.DB.prepare('UPDATE roster_players SET cz_json = ?, cz_checked_at = ? WHERE id = ?').bind(json, t, p.id));
   }
   const club = String(body!.club_code ?? '').trim();

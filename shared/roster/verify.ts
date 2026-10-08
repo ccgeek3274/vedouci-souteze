@@ -1,8 +1,11 @@
 // Roster verification against chess.cz (M6). Ported and extended from sscr-soupiska `enrichRosterPlayers`
 // and kontrolasoupisky: look players up (one club-members call per club, per-player fallback), keep a snapshot
-// of the chess.cz record, and derive the deficiencies the rozpis requires the vedoucí to report and to strike:
-// players without registration, without paid fee and guests without a hosting permit.
-import { fold } from '../text';
+// of the chess.cz record plus the matching hosting / foreigner registry rows and higher-competition roster
+// entries, and derive the deficiencies: registration (rozpis: strike players without it), the roster letters
+// (Z by the sscr-soupiska rule, H = other club, C = foreigner on chess.cz, V = in Z of a higher competition)
+// and confirmed hosting permits / foreigner registrations.
+import { fold, teamNameScore } from '../text';
+import { sameCompetition, type ForeignerRow, type HostingRow } from '../registry';
 
 /** The subset of the chess.cz Member / ClubMember record kept with the roster player. */
 export type CzMember = {
@@ -19,7 +22,20 @@ export type CzMember = {
 };
 
 /** found = record by LOK/FIDE id · not_found = id unknown to chess.cz · no_id = no id on the roster (candidates by name). */
-export type CzCheck = { status: 'found' | 'not_found' | 'no_id'; member?: CzMember; candidates?: CzMember[] };
+export type CzCheck = {
+  status: 'found' | 'not_found' | 'no_id';
+  member?: CzMember;
+  candidates?: CzMember[];
+  /** Registry rows of the player (by LOK; pending hosting rows by name). Undefined = registries not loaded. */
+  hosting?: HostingRow[];
+  foreigner?: ForeignerRow[];
+  /** Entries on rosters of higher competitions; undefined = not loaded. */
+  higher?: HigherEntry[];
+  /** Teams of the team's club found in higher competitions (context for the V check). */
+  higherTeams?: string[];
+};
+
+export type HigherEntry = { compId: number; comp: string; team: string; z: boolean; h: boolean };
 
 export type CheckPlayer = {
   name: string;
@@ -167,76 +183,199 @@ export function sameName(a: string, b: string): boolean {
   return words(a) === words(b);
 }
 
-/** Fee year required for the season: the calendar year in which it starts (2026/2027 → 2026). */
-export function requiredFeeYear(season: string): number {
-  return parseInt(season.slice(0, 4), 10);
+// ---- Registries and higher competitions --------------------------------------------------------
+
+export type Registry = { hosting: HostingRow[]; foreigners: ForeignerRow[] };
+
+/** Registry rows of one player: by LOK (FIDE for foreigners); pending hosting rows carry no LOK → by name. */
+export function registryRows(p: CheckPlayer, reg: Registry): Pick<CzCheck, 'hosting' | 'foreigner'> {
+  return {
+    hosting: reg.hosting.filter((r) => (r.lok ? r.lok === p.lok : sameName(r.name, p.name))).slice(0, 5),
+    foreigner: reg.foreigners.filter((r) => (r.lok && r.lok === p.lok) || (r.fide && r.fide === p.fide) || (!r.lok && !r.fide && sameName(r.name, p.name))).slice(0, 5),
+  };
+}
+
+/** chess.cz competition levels (compLevel) of our level codes; lower = higher competition. */
+export const LEVEL_RANK: Record<string, number> = { KP: 3, KS: 4, RP: 5, RS: 6 };
+
+/** Team name without the team letter ("Kralupy C" → "Kralupy") — for finding the club's other teams. */
+export function clubPart(name: string): string {
+  return name.trim().replace(/\s+[A-Za-z]$/, '');
+}
+
+type CompetitionSummary = { compId: number; compName: string; compLevel?: number; compYoungOrAdult?: string };
+type Region = { regionCode: string; regionName: string; competitions: CompetitionSummary[] };
+
+/**
+ * Rosters of the adult competitions above ours (ŠSČR + our region) for the V check. Only teams whose name
+ * resembles one of ours (club part, letters ignored) are fetched — a false positive costs one cached call,
+ * the decision itself is by LOK and the Z/H flags on chess.cz.
+ */
+export async function collectHigherRosters(
+  get: ChessczGetter,
+  opts: { year: number; rank: number; region: string; teamNames: string[] },
+  onProgress: (text: string) => void = () => {},
+): Promise<{ byLok: Map<number, HigherEntry[]>; teams: { comp: string; team: string; ours: string[] }[] }> {
+  const regions = Object.entries((await get(`/competitions/${opts.year}`)) as Record<string, Region> ?? {});
+  const ours = regions.filter(([k, r]) => k === '98' || fold(r.regionName) === fold(opts.region) || fold(opts.region).includes(fold(r.regionCode)));
+  const comps = ours.flatMap(([, r]) => r.competitions)
+    .filter((c) => (c.compYoungOrAdult ?? 'A') === 'A' && c.compLevel != null && c.compLevel < opts.rank);
+  const byLok = new Map<number, HigherEntry[]>();
+  const teams: { comp: string; team: string; ours: string[] }[] = [];
+  for (const [i, c] of comps.entries()) {
+    onProgress(`vyšší soutěže ${i + 1}/${comps.length}`);
+    const rows = asArray((await get(`/competitions/${c.compId}/table`)) as { teamId: number; teamName: string }[] | null);
+    for (const row of rows) {
+      const mine = opts.teamNames.filter((n) => teamNameScore(clubPart(n), clubPart(row.teamName)) >= 0.8);
+      if (!mine.length) continue;
+      teams.push({ comp: c.compName, team: row.teamName, ours: mine });
+      const roster = asArray((await get(`/competitions/${c.compId}/team/${row.teamId}/roster`)) as any[] | null);
+      for (const e of roster) {
+        const lok = intOrNull(e?.playerId);
+        if (!lok) continue;
+        const f = String(e.playerFlags ?? '').split(/\s+/);
+        const entry = { compId: c.compId, comp: c.compName, team: row.teamName, z: f.includes('Z'), h: f.includes('H') };
+        byLok.set(lok, [...(byLok.get(lok) ?? []), entry]);
+      }
+    }
+  }
+  return { byLok, teams };
+}
+
+// ---- Rules ------------------------------------------------------------------------------------
+
+const hasLetter = (flags: string) => flagList(flags).some((f) => f === 'H' || f === 'V' || f === 'C');
+
+/**
+ * Expected starting line-up (Z) — sscr-soupiska `recalcZaklad`: from the top, the first `count` players,
+ * with at most ceil(count/2)−1 letter players (H/V/C); a further letter player is skipped. Struck players don't count.
+ */
+export function expectedBase(players: { flags: string; struck?: number }[], count: number): (boolean | null)[] {
+  const maxLetters = Math.max(0, Math.ceil(count / 2) - 1);
+  let assigned = 0;
+  let letters = 0;
+  return players.map((p) => {
+    if (p.struck) return null;
+    if (assigned >= count) return false;
+    if (hasLetter(p.flags)) {
+      if (letters >= maxLetters) return false;
+      letters++;
+    }
+    assigned++;
+    return true;
+  });
 }
 
 export type Issue = {
   level: 'bad' | 'warn';
   text: string;
-  /** Reason to strike the player before the definitive bulletin (rozpis: registration, fee, permit). */
+  /** Reason to strike the player before the definitive bulletin (rozpis: registration, hosting permit). */
   strike?: boolean;
 };
 
 export type IssueContext = {
   clubCode: string | null;
-  feeYear: number;
-  /** Other teams of the same competition with this player on the current roster. */
-  sameCompetition?: string[];
-  /** Teams in the user's other competitions of the season. */
-  elsewhere?: string[];
+  /** Our competition name (chess.cz form preferred) — registry rows are per competition. */
+  compName: string;
+  /** Expected Z by the rule; null = not evaluated. */
+  expectedZ?: boolean | null;
+  /** Size of the starting line-up (number of boards) — for the explanation of the Z rule. */
+  base?: number;
 };
 
 export const describeMember = (m: CzMember) =>
   `${m.fullName} (${[m.birthYear, m.czeId && `LOK ${m.czeId}`, m.clubName].filter(Boolean).join(', ')})`;
 
-/** Deficiencies of one roster player; empty when OK. Unchecked players only get the local checks. */
-export function playerIssues(p: CheckPlayer, check: CzCheck | null, ctx: IssueContext): Issue[] {
+/** Deficiencies of one roster player; empty when OK. Unchecked players only get the local checks (Z). */
+export function playerIssues(p: CheckPlayer & { base?: number }, check: CzCheck | null, ctx: IssueContext): Issue[] {
   const out: Issue[] = [];
   const flags = flagList(p.flags);
   const guest = flags.includes('H');
   const foreign = flags.includes('C');
+  const free = flags.includes('V');
   const m = check?.member;
 
   if (check?.status === 'no_id') {
     const c = check.candidates ?? [];
     out.push({
-      level: foreign ? 'warn' : 'bad',
+      level: 'bad',
       text: 'chybí č. LOK' + (c.length === 1 ? ` — na chess.cz ${describeMember(c[0])}` : c.length > 1 ? ` — na chess.cz ${c.length} hráči tohoto jména` : ' — na chess.cz nenalezen'),
     });
   } else if (check?.status === 'not_found') {
     out.push({ level: 'bad', text: `${p.lok ? `č. LOK ${p.lok}` : `FIDE ID ${p.fide}`} na chess.cz nenalezeno` });
   }
 
+  // null = clubs unknown (not checked yet / team club not determined) → fall back to the H letter.
+  let otherClub: boolean | null = null;
   if (m) {
     const reg = fold(m.registration);
     if (reg === 'cizinec') {
-      // Foreigners have their own registration status on chess.cz.
-      if (!foreign) out.push({ level: 'warn', text: 'registrován jako cizinec — chybí označení C' });
+      if (!foreign) out.push({ level: 'bad', text: 'na chess.cz registrován jako cizinec — chybí označení C' });
     } else if (reg !== 'aktivni') {
-      out.push({ level: 'bad', strike: true, text: `bez registrace v ŠSČR (${m.registration || 'neznámá'})` });
+      out.push({ level: 'bad', strike: true, text: `bez platné registrace v ŠSČR (${m.registration || 'neznámá'})` });
     }
-    if (!m.feeYear || m.feeYear < ctx.feeYear) {
-      out.push({ level: 'bad', strike: true, text: `nezaplacený příspěvek ${ctx.feeYear}` + (m.feeYear ? ` (naposledy ${m.feeYear})` : '') });
-    }
+    if (foreign && reg === 'aktivni') out.push({ level: 'bad', text: 'označen C, ale na chess.cz není registrován jako cizinec' });
     if (m.fullName && !sameName(p.name, m.fullName)) out.push({ level: 'warn', text: `na chess.cz jako „${m.fullName}“` });
     if (p.birth_year && m.birthYear && p.birth_year !== m.birthYear) out.push({ level: 'warn', text: `rok narození na chess.cz ${m.birthYear}` });
     if (p.fide && m.fideId && p.fide !== m.fideId) out.push({ level: 'warn', text: `FIDE ID na chess.cz ${m.fideId}` });
     if (ctx.clubCode && m.clubId) {
-      const otherClub = m.clubId !== ctx.clubCode;
-      if (otherClub && !guest && !foreign) {
-        out.push({ level: 'bad', strike: !p.guest_permit, text: `člen oddílu ${m.clubName || m.clubId} — chybí označení H` });
-      }
-      if (!otherClub && guest) out.push({ level: 'warn', text: 'označen H, ale je členem oddílu družstva' });
+      otherClub = m.clubId !== ctx.clubCode;
+      if (otherClub && !guest && !foreign) out.push({ level: 'bad', text: `člen oddílu ${m.clubName || m.clubId} — chybí označení H` });
+      if (!otherClub && guest) out.push({ level: 'bad', text: 'označen H, ale je členem oddílu družstva' });
     }
   }
 
-  if ((guest || foreign) && !p.guest_permit) {
-    out.push({ level: 'bad', strike: guest, text: guest ? 'chybí povolení hostování' : 'chybí doklad cizince' });
+  // Hosting permit: registry (hostovani.appchess.cz) or a paper permit marked by the vedoucí.
+  const needsPermit = !foreign && (otherClub ?? guest);
+  if (needsPermit && check?.hosting) {
+    const rows = check.hosting;
+    const ok = rows.find((r) => !r.pending && r.hostClub === ctx.clubCode && sameCompetition(r.comp, ctx.compName));
+    const sameClub = rows.find((r) => !r.pending && r.hostClub === ctx.clubCode);
+    const pending = rows.find((r) => r.pending);
+    if (ok) { /* confirmed */ }
+    else if (p.guest_permit) { /* documented on paper */ }
+    else if (sameClub) out.push({ level: 'warn', text: `hostování potvrzeno pro jinou soutěž (${sameClub.comp})` });
+    else if (pending) out.push({ level: 'bad', strike: true, text: `hostování čeká na schválení (${pending.hostClubName}, ${pending.comp}; chybí: ${pending.pending})` });
+    else if (rows.length) out.push({ level: 'bad', strike: true, text: `hostování potvrzeno jen pro ${rows.map((r) => `${r.hostClubName} (${r.comp})`).join(', ')}` });
+    else out.push({ level: 'bad', strike: true, text: 'chybí povolení hostování' });
+  } else if (needsPermit && guest && !p.guest_permit && !check?.hosting) {
+    out.push({ level: 'bad', strike: true, text: 'chybí povolení hostování' });
   }
-  for (const t of ctx.sameCompetition ?? []) out.push({ level: 'bad', text: `také na soupisce ${t}` });
-  for (const t of ctx.elsewhere ?? []) out.push({ level: 'warn', text: `také na soupisce ${t}` });
+
+  // Foreigner registration (registracecizincu.appchess.cz) or a document marked by the vedoucí.
+  if (foreign && check?.foreigner) {
+    const rows = check.foreigner;
+    const ok = rows.find((r) => !r.pending && r.club === ctx.clubCode && sameCompetition(r.comp, ctx.compName));
+    const sameClub = rows.find((r) => !r.pending && r.club === ctx.clubCode);
+    const pending = rows.find((r) => r.pending);
+    if (ok || p.guest_permit) { /* confirmed */ }
+    else if (sameClub) out.push({ level: 'warn', text: `registrace cizince potvrzena pro jinou soutěž (${sameClub.comp})` });
+    else if (pending) out.push({ level: 'bad', text: `registrace cizince čeká na schválení (chybí: ${pending.pending})` });
+    else if (rows.length) out.push({ level: 'bad', text: `registrace cizince jen pro ${rows.map((r) => `${r.clubName} (${r.comp})`).join(', ')}` });
+    else out.push({ level: 'bad', text: 'chybí registrace cizince' });
+  } else if (foreign && !p.guest_permit && !check?.foreigner) {
+    out.push({ level: 'bad', text: 'chybí doklad cizince' });
+  }
+
+  // V = a player of the club who is in the starting line-up (Z) of the club's team in a higher competition.
+  if (check?.higher) {
+    const inZ = check.higher.filter((e) => e.z && !e.h);
+    if (free && !inZ.length) {
+      out.push({
+        level: check.higherTeams?.length ? 'bad' : 'warn',
+        text: check.higherTeams?.length ? 'označen V, ale není v základní sestavě vyšší soutěže'
+          : 'označen V, ale družstvo oddílu ve vyšší soutěži nebylo nalezeno',
+      });
+    }
+    if (!free && !guest && !foreign && inZ.length) {
+      out.push({ level: 'bad', text: `v základní sestavě ${inZ.map((e) => `${e.team} (${e.comp})`).join(', ')} — chybí označení V` });
+    }
+  }
+
+  if (ctx.expectedZ != null && ctx.expectedZ !== !!p.base) {
+    const rule = ctx.base ? ` — Z = prvních ${ctx.base} hráčů, z nich nejvýše ${Math.max(0, Math.ceil(ctx.base / 2) - 1)} H/V/C` : '';
+    out.push({ level: 'bad', text: (ctx.expectedZ ? 'má být v základní sestavě (Z)' : 'nemá být v základní sestavě (Z)') + rule });
+  }
   return out;
 }
 

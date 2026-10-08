@@ -6,6 +6,7 @@ import { competitions } from './routes/competitions';
 import { teams } from './routes/teams';
 import { imports } from './routes/imports';
 import { tokens } from './routes/tokens';
+import { registry } from './routes/registry';
 import type { AppEnv } from './types';
 
 // Only /api/* reaches the Worker (assets.run_worker_first); everything else is the SPA.
@@ -18,6 +19,7 @@ app.route('/chesscz', chesscz);
 app.route('/competitions', competitions);
 app.route('/import', imports);
 app.route('/tokens', tokens);
+app.route('/registry', registry);
 app.route('/', teams);
 
 app.notFound((c) => c.json({ error: 'Nenalezeno' }, 404));
