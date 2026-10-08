@@ -101,6 +101,8 @@ describe('playerIssues', () => {
   });
 
   it('checks Z against the expected line-up', () => {
+    expect(playerIssues(player({ base: 1, flags: 'H', guest_permit: 1 }), null, { ...ctx, expectedZ: 'optional' })).toEqual([]);
+    expect(playerIssues(player({ base: 0, flags: 'H', guest_permit: 1 }), null, { ...ctx, expectedZ: 'optional' })).toEqual([]);
     expect(playerIssues(player({ base: 0 }), found({}), { ...ctx, expectedZ: true })[0].text).toBe('má být v základní sestavě (Z)');
     expect(playerIssues(player({ base: 1 }), null, { ...ctx, expectedZ: false })[0].text).toBe('nemá být v základní sestavě (Z)');
   });
@@ -119,8 +121,8 @@ describe('helpers', () => {
 
   it('computes the starting line-up like sscr-soupiska recalcZaklad', () => {
     const f = (s: string) => s.split('').map((x) => ({ flags: x === '.' ? '' : x }));
-    // 8 boards → max 3 letter players; the 4th letter player is skipped, the line-up extends
-    expect(expectedBase(f('HH.VC...H..'), 8)).toEqual([true, true, true, true, false, true, true, true, false, true, false]);
+    // 8 boards → max 3 letter players; further letter players are skipped (may be marked Z), the line-up extends
+    expect(expectedBase(f('HH.VC...H..'), 8)).toEqual([true, true, true, true, 'optional', true, true, true, 'optional', true, false]);
     expect(expectedBase([{ flags: '' }, { flags: '', struck: 1 }, { flags: '' }], 2)).toEqual([true, null, true]);
   });
 
@@ -137,5 +139,18 @@ describe('helpers', () => {
       foreigners: [],
     });
     expect(rows.hosting?.length).toBe(2);
+  });
+});
+
+describe('parseZCell', () => {
+  it('accepts yes in various forms and reports extra words', async () => {
+    const { parseZCell } = await import('../roster/xlsx');
+    expect(parseZCell('ano')).toEqual({ z: true, rest: '' });
+    expect(parseZCell('Ano, ml.')).toEqual({ z: true, rest: 'ml.' });
+    expect(parseZCell('Z')).toEqual({ z: true, rest: '' });
+    expect(parseZCell('z.')).toEqual({ z: true, rest: '' });
+    expect(parseZCell('ne')).toEqual({ z: false, rest: '' });
+    expect(parseZCell('st.')).toEqual({ z: false, rest: 'st.' });
+    expect(parseZCell('')).toEqual({ z: false, rest: '' });
   });
 });

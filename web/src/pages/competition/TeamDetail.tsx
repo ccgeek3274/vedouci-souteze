@@ -8,6 +8,7 @@ import { parseContactPaste } from '../../../../shared/contacts';
 import type { Contact, RosterPlayer, RosterVersion, Team } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 import { IssueList, useRosterCheck } from './RosterCheck';
+import { RosterEditor } from './RosterEditor';
 import { checkTeamRoster, checkedAt, competitionIssues, prepareCheck } from '../../lib/rosterCheck';
 import { strikeReason } from '../../../../shared/roster/verify';
 
@@ -44,6 +45,7 @@ export function TeamDetail() {
   const [checkError, setCheckError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [version, setVersion] = useState<number | null>(null);
+  const [editing, setEditing] = useState(false);
   const key = ['team', teamId, version];
   const { data, isLoading } = useQuery({
     queryKey: key,
@@ -87,8 +89,9 @@ export function TeamDetail() {
             {latest && (at ? ` · chess.cz ověřeno ${czDateTime(at)}` : ' · neověřeno na chess.cz')}</span>}
           <span className="spacer" />
           {progress && <span className="muted mono">{progress}</span>}
-          {latest && <button className="btn btn-small" disabled={!!progress} onClick={verify}>Ověřit na chess.cz</button>}
-          {data.versions.length > 0 && (
+          {latest && !editing && <button className="btn btn-small" style={{ whiteSpace: 'nowrap' }} onClick={() => setEditing(true)}>Upravit soupisku</button>}
+          {latest && !editing && <button className="btn btn-small" style={{ whiteSpace: 'nowrap' }} disabled={!!progress} onClick={verify}>Ověřit na chess.cz</button>}
+          {data.versions.length > 0 && !editing && (
             <select className="input input-sm" value={data.roster?.version ?? ''} onChange={(e) => setVersion(Number(e.target.value))}>
               {data.versions.map((v) => (
                 <option key={v.id} value={v.version}>verze {v.version} · {czDateTime(v.created_at)} · {v.source}</option>
@@ -99,6 +102,9 @@ export function TeamDetail() {
         <div className="card-body table-scroll">
           {!data.roster ? (
             <p className="muted">Soupiska zatím nebyla importována. <Link to="../soupisky">Importovat soupisku</Link></p>
+          ) : editing ? (
+            <RosterEditor competitionId={comp.competition.id} team={t} players={data.roster.players} boards={comp.competition.boards}
+              onDone={async (saved) => { setEditing(false); if (saved) { setVersion(null); await refresh(); } }} />
           ) : (
             <>
               {checkError && <div className="alert">{checkError}</div>}
@@ -119,7 +125,7 @@ export function TeamDetail() {
                         <label className="row" style={{ gap: 6 }} title={needsDocument(p.flags)}>
                           <input type="checkbox" checked={!!p.guest_permit}
                             onChange={async (e) => { await api.patch(`/roster-players/${p.id}`, { guest_permit: e.target.checked ? 1 : 0 }); refresh(); }} />
-                          <span className={p.guest_permit ? undefined : 'muted'}>{p.guest_permit ? 'doloženo' : 'chybí doklad'}</span>
+                          {p.guest_permit ? <span>doloženo</span> : null}
                         </label>
                       )}</td>
                       {issues && (

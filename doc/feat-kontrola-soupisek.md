@@ -10,8 +10,11 @@ běh v prohlížeči `web/src/lib/rosterCheck.ts`, registry ve Workeru `worker/l
   (hráči bez registrace, na více než třech soupiskách) — aplikace stránku jen přebírá a filtruje na soutěž;
   smysl má až těsně před definitivním zpravodajem (po nahrání soupisek do chess.cz).
 - **Kontrolují se označení** (soupiska může obsahovat chybu):
-  - **Z** podle pravidla e-soupisky (sscr-soupiska `recalcZaklad`): prvních N hráčů (N = počet šachovnic),
-    písmenkových H/V/C v Z nejvýše ceil(N/2)−1 (8 → 3, 5 → 2), další písmenkový se přeskočí; vyškrtnutí se nepočítají.
+  - **Z** musí sedět bez výjimek, pravidlo e-soupisky (sscr-soupiska `recalcZaklad`): prvních N hráčů (N = počet
+    šachovnic), z nich nejvýše ceil(N/2)−1 písmenkových H/V/C (8 → 3, 5 → 2); každý další písmenkový se přeskočí
+    a základní sestava se tím posune/prodlouží (4 a více písmenkových na soupisce je v pořádku). Šedá zóna:
+    přeskočený písmenkový hráč smí mít Z (hraje jako Z, ale nepočítá se do počtu) → `expectedBase` vrací `'optional'`
+    a kontrola u něj Z nehlásí. Vyškrtnutí hráči se nepočítají.
   - **C** = na profilu chess.cz registrace „Cizinec“ (obousměrně).
   - **H** = host: hráč jiného oddílu než družstvo (obousměrně).
   - **V** = volný: hráč mateřského oddílu, který je v základní sestavě (Z) družstva oddílu ve vyšší soutěži (obousměrně).
@@ -51,3 +54,12 @@ vyškrtnutím (párování LOK, bez LOK jméno). Změna LOK/FIDE snapshot zahod�
 ## Výstup
 - Nedostatky (✕) a upozornění (!) u hráčů; vyškrtnutí vždy ručně (jednotlivě / „Vyškrtnout navržené“), lze vrátit.
 - „Nedostatky pro předběžný zpravodaj“ = text po družstvech (`deficiencyReport`) — v M8 se vloží do zpravodaje.
+
+## Ruční úprava soupisky
+Detail družstva → „Upravit soupisku“: jméno, rok, LOK, FIDE, označení (K/ZK, H/V/C), Z, pořadí, přidání / odebrání
+hráče, „Nastavit Z podle pravidla“ (přeskočeným písmenkovým ponechá volbu kapitána). Uložení = nová verze soupisky
+(zdroj `manual`) přes běžný import, takže „doloženo“, vyškrtnutí a snapshot kontroly jdou s hráčem (párování LOK).
+
+## Import: sloupec Z
+Buňka se rozdělí na slova; Z = kterékoli z „ano / a / z / x / 1 / ✓ / yes“ (bez ohledu na velikost, tečku).
+Ostatní slova (např. „ano,ml.“ — kapitán sem napsal rozlišení ml./st.) se nezahodí, ale vypíší jako varování importu.

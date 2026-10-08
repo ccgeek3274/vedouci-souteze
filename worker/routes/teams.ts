@@ -183,7 +183,7 @@ teams.post('/competitions/:id/rosters/import', async (c) => {
 
   const preview = await previewRosterImport(c.env.DB, team, draft);
   if (!body?.apply) return c.json({ preview, candidates, draft });
-  const source = body.source === 'json' ? 'json' : 'xlsx';
+  const source = body.source === 'json' || body.source === 'manual' ? body.source : 'xlsx';
   const { version, unchanged } = await applyRosterImport(c.env.DB, team, draft, preview, {
     source, filename: (body.filename ?? '').slice(0, 200), userId: c.get('user').id, competitionId: comp.id,
   });

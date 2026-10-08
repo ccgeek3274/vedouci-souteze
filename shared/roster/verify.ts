@@ -6,6 +6,7 @@
 // and confirmed hosting permits / foreigner registrations.
 import { fold, teamNameScore } from '../text';
 import { sameCompetition, type ForeignerRow, type HostingRow } from '../registry';
+import type { ExpectedZ } from './draft';
 
 /** The subset of the chess.cz Member / ClubMember record kept with the roster player. */
 export type CzMember = {
@@ -244,27 +245,7 @@ export async function collectHigherRosters(
 
 // ---- Rules ------------------------------------------------------------------------------------
 
-const hasLetter = (flags: string) => flagList(flags).some((f) => f === 'H' || f === 'V' || f === 'C');
-
-/**
- * Expected starting line-up (Z) — sscr-soupiska `recalcZaklad`: from the top, the first `count` players,
- * with at most ceil(count/2)−1 letter players (H/V/C); a further letter player is skipped. Struck players don't count.
- */
-export function expectedBase(players: { flags: string; struck?: number }[], count: number): (boolean | null)[] {
-  const maxLetters = Math.max(0, Math.ceil(count / 2) - 1);
-  let assigned = 0;
-  let letters = 0;
-  return players.map((p) => {
-    if (p.struck) return null;
-    if (assigned >= count) return false;
-    if (hasLetter(p.flags)) {
-      if (letters >= maxLetters) return false;
-      letters++;
-    }
-    assigned++;
-    return true;
-  });
-}
+export { expectedBase, type ExpectedZ } from './draft';
 
 export type Issue = {
   level: 'bad' | 'warn';
@@ -277,8 +258,8 @@ export type IssueContext = {
   clubCode: string | null;
   /** Our competition name (chess.cz form preferred) — registry rows are per competition. */
   compName: string;
-  /** Expected Z by the rule; null = not evaluated. */
-  expectedZ?: boolean | null;
+  /** Expected Z by the rule; 'optional' = skipped letter player (may be marked Z); null = not evaluated. */
+  expectedZ?: ExpectedZ | null;
   /** Size of the starting line-up (number of boards) — for the explanation of the Z rule. */
   base?: number;
 };
@@ -372,7 +353,7 @@ export function playerIssues(p: CheckPlayer & { base?: number }, check: CzCheck 
     }
   }
 
-  if (ctx.expectedZ != null && ctx.expectedZ !== !!p.base) {
+  if (typeof ctx.expectedZ === 'boolean' && ctx.expectedZ !== !!p.base) {
     const rule = ctx.base ? ` — Z = prvních ${ctx.base} hráčů, z nich nejvýše ${Math.max(0, Math.ceil(ctx.base / 2) - 1)} H/V/C` : '';
     out.push({ level: 'bad', text: (ctx.expectedZ ? 'má být v základní sestavě (Z)' : 'nemá být v základní sestavě (Z)') + rule });
   }

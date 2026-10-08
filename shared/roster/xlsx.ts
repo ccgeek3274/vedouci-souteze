@@ -99,6 +99,19 @@ function tableColumns(g: Grid, r: number): Columns {
   return cols;
 }
 
+const Z_YES = new Set(['ano', 'a', 'z', 'x', '1', '✓', '✔', 'yes', 'y']);
+
+/** "ano", "Ano", "z", "ANO, ml." … → Z = yes; other words of the cell are returned for a warning. */
+export function parseZCell(cell: string): { z: boolean; rest: string } {
+  const parts = cell.split(/[\s,;/]+/).filter(Boolean);
+  const isYes = (w: string) => Z_YES.has(fold(w).replace(/\.$/, ''));
+  const NO = new Set(['ne', 'n', '0', '-']);
+  return {
+    z: parts.some(isYes),
+    rest: parts.filter((w) => !isYes(w) && !NO.has(fold(w))).join(' '),
+  };
+}
+
 export function parseRosterGrid(g: Grid): { draft: RosterDraft; warnings: string[] } {
   const tableRow = findAnchor(g, 'table');
   const cols = tableRow >= 0 ? tableColumns(g, tableRow) : null;
@@ -122,7 +135,8 @@ export function parseRosterGrid(g: Grid): { draft: RosterDraft; warnings: string
     const name = cellAt(g, r, cols.name);
     if (!name || /^(prijmeni|jmeno)/.test(fold(name))) continue;
     const flags = parseFlags(cols.ozn >= 0 ? cellAt(g, r, cols.ozn) : '');
-    const zCell = cols.z >= 0 ? fold(cellAt(g, r, cols.z)) : '';
+    const zCell = parseZCell(cols.z >= 0 ? cellAt(g, r, cols.z) : '');
+    if (zCell.rest) warnings.push(`Sloupec Z u hráče ${name.trim()} obsahuje navíc „${zCell.rest}“ — zkontrolujte (např. ml./st. patří ke jménu).`);
     players.push({
       jmeno: name.replace(/\s+/g, ' '),
       rok: numOrBlank(cols.rok >= 0 ? cellAt(g, r, cols.rok) : ''),
@@ -130,7 +144,7 @@ export function parseRosterGrid(g: Grid): { draft: RosterDraft; warnings: string
       lok: numOrBlank(cellAt(g, r, cols.lok)),
       fide: numOrBlank(cols.fide >= 0 ? cellAt(g, r, cols.fide) : ''),
       ozn: flags.ozn,
-      z: flags.z || /^(z|x|ano|a|1|✓)$/.test(zCell),
+      z: flags.z || zCell.z,
       source: 'xlsx',
     });
   }

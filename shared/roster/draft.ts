@@ -151,14 +151,43 @@ export function draftWarnings(d: RosterDraft, boards: number, nowYear = new Date
     if (lokSeen.has(p.lok)) out.push(`Duplicitní LOK ${p.lok}: ${lokSeen.get(p.lok)} a ${p.jmeno}.`);
     lokSeen.set(p.lok, p.jmeno);
   }
-  const base = d.players.filter((p) => p.z);
-  if (base.length && base.length !== boards) out.push(`V základní sestavě je ${base.length} hráčů (soutěž má ${boards} šachovnic).`);
-  const guestsInBase = base.filter((p) => /\b(H|V|C)\b/.test(p.ozn)).length;
-  const maxGuests = Math.floor((boards - 1) / 2);
-  if (guestsInBase > maxGuests) out.push(`V základní sestavě je ${guestsInBase} hráčů H/V/C (max. ${maxGuests}).`);
+  const exp = expectedBase(d.players.map((p) => ({ flags: p.ozn })), boards);
+  const missingZ = d.players.filter((p, i) => exp[i] === true && !p.z).map((p) => p.jmeno);
+  const extraZ = d.players.filter((p, i) => exp[i] === false && p.z).map((p) => p.jmeno);
+  if (missingZ.length || extraZ.length) {
+    out.push(`Základní sestava neodpovídá pravidlu (prvních ${boards} hráčů, nejvýše ${maxLetters(boards)} H/V/C, další písmenkoví se přeskočí)`
+      + (missingZ.length ? ` — má mít Z: ${missingZ.join(', ')}` : '') + (extraZ.length ? ` — nemá mít Z: ${extraZ.join(', ')}` : '') + '.');
+  }
   if (!d.players.some((p) => /\bK\b/.test(p.ozn)) && !d.extra.kapJmeno) out.push('Není uveden kapitán.');
   if (!d.extra.kapEmail && !d.extra.zastEmail && !d.extra.komunikace.some((c) => c.email)) out.push('Chybí e-mailový kontakt.');
   if (!d.extra.hraciMistnost) out.push('Chybí hrací místnost.');
   if (!d.extra.rozhodci.length) out.push('Není navržen rozhodčí.');
   return out;
+}
+
+/** true = in the starting line-up, false = not, 'optional' = a skipped letter player inside the line-up (grey zone). */
+export type ExpectedZ = boolean | 'optional';
+
+const isLetterPlayer = (flags: string) => flags.split(' ').some((f) => f === 'H' || f === 'V' || f === 'C');
+export const maxLetters = (count: number) => Math.max(0, Math.ceil(count / 2) - 1);
+
+/**
+ * Expected starting line-up (Z) — sscr-soupiska `recalcZaklad`: from the top, `count` players, of which at most
+ * ceil(count/2)−1 letter players (H/V/C); every further letter player is skipped and the line-up extends.
+ * A skipped letter player may still be marked Z (he plays as if in Z but does not count) → 'optional'.
+ * Struck players are left out (null).
+ */
+export function expectedBase(players: { flags: string; struck?: number }[], count: number): (ExpectedZ | null)[] {
+  let assigned = 0;
+  let letters = 0;
+  return players.map((p) => {
+    if (p.struck) return null;
+    if (assigned >= count) return false;
+    if (isLetterPlayer(p.flags)) {
+      if (letters >= maxLetters(count)) return 'optional';
+      letters++;
+    }
+    assigned++;
+    return true;
+  });
 }
