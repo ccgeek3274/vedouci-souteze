@@ -4,14 +4,16 @@ import { api, apiErrorText } from '../../lib/api';
 import { czDate, REQUEST_KIND_LABEL, REQUEST_STATUS_LABEL } from '../../lib/format';
 import type { TeamWithSummary } from '../../lib/types';
 import {
-  CONSTRAINT_LABEL, defaultDeadline, emptyNumbers, fixtures, numberProblems, sameClubGroups, suggestNumbers, table, tableSize, violations,
-  type ConstraintKind, type DrawConstraint, type DrawInput,
+  conditionStates, defaultDeadline, describeDraw, drawConstraints, emptyNumbers, fixtures, numberProblems, sameClubGroups, suggestNumbers,
+  table, tableSize, violations, type DrawInput,
 } from '../../../../shared/draw/check';
 import { matchStart, shortTime } from '../../../../shared/startTime';
 import { useCompetition } from './CompetitionLayout';
+import { RequestTable, STATE_CLASS } from './RequestItems';
 
-// Draw meeting (M7): documents for the meeting, conditions of the controlled draw, draw numbers entered by the
-// manager (the application never draws), the Berger draw and its rule checks. Printable (Tisk).
+// Draw meeting (M7). Workflow: numbers start empty; requests (start times, draw conditions) are decided and
+// completed during the meeting, numbers are filled in one by one as teams are drawn (each saved at once).
+// The application never draws — it evaluates the conditions and ranks free numbers for a controlled draw.
 export function Draw() {
   const { data, refresh } = useCompetition();
   const c = data.competition;
@@ -19,27 +21,35 @@ export function Draw() {
   const size = tableSize(active.length);
   const deadline = c.mutual_deadline || defaultDeadline(c.season);
   const [error, setError] = useState<string | null>(null);
-  // Numbers being tried (not saved yet); initialised from the teams.
-  const saved = Object.fromEntries(active.map((t) => [t.id, t.draw_no ? String(t.draw_no) : '']));
-  const [nums, setNums] = useState<Record<string, string>>(saved);
-  const dirty = active.some((t) => (nums[t.id] ?? '') !== saved[t.id]);
+  const [typed, setTyped] = useState<Record<string, string>>({});
 
-  const run = async (fn: () => Promise<unknown>) => {
-    setError(null);
-    try { await fn(); await refresh(); } catch (e) { setError(apiErrorText(e)); }
-  };
-
-  const teams = active.map((t) => ({ ...t, draw_no: Number(nums[t.id]) || null }));
+  const teams = active;
   const input: DrawInput = {
-    teams, constraints: data.constraints, deadline,
+    teams, constraints: drawConstraints(data.requests), deadline,
     roundDates: Array.from({ length: size - 1 }, (_, i) => data.rounds.find((r) => r.round === i + 1)?.date),
   };
   const assign = new Map(teams.filter((t) => t.draw_no).map((t) => [t.id, t.draw_no!]));
   const problems = numberProblems(teams);
-  const viol = problems.length ? [] : violations(input, assign, emptyNumbers(teams));
-  const key = JSON.stringify([nums, data.constraints, deadline]);
-  const suggestion = useMemo(() => (problems.length ? null : suggestNumbers(input, 100_000)), [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const empty = emptyNumbers(teams);
+  const viol = problems.length ? [] : violations(input, assign, empty);
+  const states = conditionStates(input, assign, empty);
+  const memoKey = JSON.stringify([teams.map((t) => t.draw_no), input.constraints, deadline]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const suggestion = useMemo(() => (problems.length ? null : suggestNumbers(input, 100_000)), [memoKey]);
   const complete = teams.every((t) => t.draw_no) && !problems.length;
+  const used = new Set(assign.values());
+  const free = Array.from({ length: size }, (_, i) => i + 1).filter((x) => !used.has(x));
+
+  const save = async (numbers: Record<string, number | null>) => {
+    setError(null);
+    try { await api.put(`/competitions/${c.id}/draw-numbers`, { numbers }); await refresh(); } catch (e) { setError(apiErrorText(e)); }
+    setTyped({});
+  };
+  const startReqs = data.requests.filter((r) => r.kind === 'start_time');
+  const drawReqs = data.requests.filter((r) => r.kind === 'draw_no');
+  const otherReqs = data.requests.filter((r) => r.kind !== 'start_time' && r.kind !== 'draw_no');
+  const pairs = sameClubGroups(teams).flatMap((g) => g.flatMap((x, i) => g.slice(i + 1).map((y) => [x, y] as const)));
+  const unresolved = [...states.values()].filter((x) => x.state === 'unresolved').length;
 
   return (
     <>
@@ -51,34 +61,75 @@ export function Draw() {
       <h2 className="print-only">{c.name} {c.season} — podklady pro losovací schůzi</h2>
 
       <Documents teams={active} deadline={deadline} />
-      <Conditions teams={active} constraints={data.constraints} size={size} run={run} competitionId={c.id} />
+
+      <div className="card no-print">
+        <div className="card-strip"><h2>Začátky utkání</h2>
+          <span className="helper">Schvaluje se na losovací schůzi; schválený požadavek = výjimka v rozlosování (kromě posledního kola).</span></div>
+        <div className="card-body table-scroll">
+          {startReqs.length ? <RequestTable requests={startReqs} /> : <p className="muted" style={{ margin: 0 }}>Žádné požadavky na začátek utkání.</p>}
+        </div>
+      </div>
+
+      <div className="card no-print">
+        <div className="card-strip"><h2>Požadavky na losování</h2>
+          <span className="helper">Upřesněte během schůze; neúplné = nevyřešeno{unresolved ? ` (${unresolved})` : ''}. Zamítnuté se nekontrolují.</span></div>
+        <div className="card-body table-scroll">
+          {drawReqs.length ? <RequestTable requests={drawReqs} states={states} /> : <p className="muted" style={{ marginTop: 0 }}>Žádné požadavky na losování (přidávají se na záložce Požadavky nebo u družstva).</p>}
+          <div className="section-title">Pravidlo: družstva stejného oddílu se utkají do {czDate(deadline)}</div>
+          {pairs.length ? (
+            <ul className="list-plain">
+              {pairs.map(([x, y]) => {
+                const v = viol.find((q) => q.constraintId == null && q.teams.includes(x.id) && q.teams.includes(y.id));
+                const done = assign.has(x.id) && assign.has(y.id);
+                const r = done ? table(size).meeting(x.draw_no!, y.draw_no!).round : null;
+                return (
+                  <li key={x.id + y.id}>{x.name} – {y.name}{' '}
+                    {v ? <span className="tag bad">{v.text}</span> : done ? <span className="tag ok">{r}. kolo — splněno</span> : <span className="tag">čeká na losovací čísla</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : <p className="muted" style={{ margin: 0 }}>Ve skupině nejsou družstva stejného oddílu.</p>}
+        </div>
+      </div>
+
+      {otherReqs.length > 0 && (
+        <div className="card no-print">
+          <div className="card-strip"><h2>Ostatní požadavky</h2></div>
+          <div className="card-body table-scroll"><RequestTable requests={otherReqs} /></div>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-strip"><h2>Losovací čísla</h2>
-          <span className="helper">Čísla 1–{size}{active.length % 2 ? ` (jedno číslo zůstane prázdné = volno)` : ''}. Aplikace nelosuje — zadejte vylosovaná čísla.</span></div>
+          <span className="helper">Čísla 1–{size}{active.length % 2 ? ' (jedno zůstane prázdné = volno)' : ''}. Zadávejte postupně, jak se losuje — každé se hned uloží.</span></div>
         <div className="card-body table-scroll">
-          <table className="table" style={{ maxWidth: 900 }}>
-            <thead><tr><th>Družstvo</th><th>Číslo</th><th className="no-print">Řízené losování — čísla podle podmínek</th></tr></thead>
+          <table className="table" style={{ maxWidth: 960 }}>
+            <thead><tr><th>Družstvo</th><th>Číslo</th><th className="no-print">Řízené losování — čísla podle požadavků</th></tr></thead>
             <tbody>
-              {active.map((t) => {
+              {teams.map((t) => {
                 const cost = suggestion?.cost.get(t.id);
                 const ranked = cost ? [...cost.entries()].sort((a, b) => a[1] - b[1] || a[0] - b[0]) : [];
+                const cur = typed[t.id] ?? (t.draw_no ? String(t.draw_no) : '');
                 return (
                   <tr key={t.id}>
                     <td>{t.name}</td>
                     <td style={{ width: 90 }}>
-                      <input className="input input-sm mono no-print" style={{ width: 60 }} value={nums[t.id] ?? ''}
-                        onChange={(e) => setNums({ ...nums, [t.id]: e.target.value.replace(/\D/g, '') })} />
-                      <span className="print-only mono">{nums[t.id]}</span>
+                      <input className="input input-sm mono no-print" style={{ width: 60 }} value={cur}
+                        onChange={(e) => setTyped({ ...typed, [t.id]: e.target.value.replace(/\D/g, '') })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                        onBlur={() => (Number(cur) || null) !== t.draw_no && save({ [t.id]: Number(cur) || null })} />
+                      <span className="print-only mono">{t.draw_no ?? ''}</span>
                     </td>
                     <td className="no-print">
                       {ranked.map(([no, v]) => (
                         <button key={no} type="button" className={`chip num-chip${v === suggestion!.best ? ' ok' : ''}`}
                           title={v === suggestion!.best ? 'nejlepší možné' : `horší o ${v - suggestion!.best}`}
-                          onClick={() => setNums({ ...nums, [t.id]: String(no) })}>
+                          onClick={() => window.confirm(`Přidělit družstvu ${t.name} číslo ${no}?`) && save({ [t.id]: no })}>
                           {no}{v > suggestion!.best && <span className="muted">&nbsp;+{v - suggestion!.best}</span>}
                         </button>
                       ))}
+                      {!t.draw_no && !cost && <span className="muted" style={{ fontSize: 12.5 }}>bez požadavků — volná: {free.join(', ')}</span>}
                     </td>
                   </tr>
                 );
@@ -86,30 +137,25 @@ export function Draw() {
             </tbody>
           </table>
           <p className="helper-text no-print">
-            U družstev s podmínkou (nebo se stejným oddílem) a bez čísla jsou čísla seřazena od nejlepšího; zelená = splní podmínky co nejlépe,
-            „+n“ = počet bodů porušení navíc. Kliknutím číslo zkusíte (uloží se až tlačítkem).
-            {suggestion?.partial && ' Příliš mnoho družstev s podmínkami — hodnocení je jen přibližné.'}
+            U družstev s požadavkem na losování (nebo se stejným oddílem) bez čísla jsou volná čísla seřazena od nejlepšího:
+            zelená = požadavky splněny co nejlépe, „+n“ = body porušení navíc. Nevyřešené požadavky se nezapočítávají.
+            {suggestion?.partial && ' Příliš mnoho družstev s požadavky — hodnocení je jen přibližné.'}
           </p>
           {problems.map((p) => <div key={p} className="note warn">{p}</div>)}
           {viol.length > 0 && (
-            <div className="note warn"><b>Porušená pravidla a podmínky</b>
+            <div className="note warn"><b>Porušená pravidla a požadavky</b>
               <ul className="list-plain">{viol.map((v, i) => <li key={i}>{v.text}</li>)}</ul></div>
           )}
-          {!problems.length && !viol.length && assign.size > 0 && <div className="note">{complete ? 'Čísla splňují všechna pravidla a podmínky.' : 'Zatím zadaná čísla splňují pravidla a podmínky (hodnotí se jen družstva s číslem).'}</div>}
           <div className="row no-print" style={{ marginTop: 12 }}>
-            <button className="btn btn-primary" disabled={!dirty || problems.length > 0}
-              onClick={() => run(() => api.put(`/competitions/${c.id}/draw-numbers`, { numbers: Object.fromEntries(active.map((t) => [t.id, nums[t.id] || null])) }))}>
-              Uložit čísla</button>
-            <button className="btn" disabled={!dirty} onClick={() => setNums(saved)}>Vrátit uložená</button>
-            <button className="btn" disabled={!Object.values(nums).some(Boolean)} onClick={() => setNums(Object.fromEntries(active.map((t) => [t.id, ''])))}>Vymazat vše</button>
-            {dirty && <span className="tag warn">neuloženo</span>}
+            <button className="btn" disabled={!assign.size}
+              onClick={() => window.confirm('Vymazat všechna losovací čísla?') && save(Object.fromEntries(teams.map((t) => [t.id, null])))}>Vymazat všechna čísla</button>
           </div>
         </div>
       </div>
 
       {complete ? <Schedule teams={teams} /> : (
         <div className="card"><div className="card-strip"><h2>Rozlosování</h2></div>
-          <div className="card-body muted">Rozlosování se zobrazí, až budou mít všechna družstva platné losovací číslo.</div></div>
+          <div className="card-body muted">Rozlosování se zobrazí, až budou mít všechna družstva losovací číslo.</div></div>
       )}
     </>
   );
@@ -119,42 +165,41 @@ function Documents({ teams, deadline }: { teams: TeamWithSummary[]; deadline: st
   const { data } = useCompetition();
   const c = data.competition;
   const groups = sameClubGroups(teams);
+  const name = (id: string | null) => data.teams.find((t) => t.id === id)?.name ?? '?';
   const reqs = (id: string) => data.requests.filter((r) => r.team_id === id);
   const general = data.requests.filter((r) => !r.team_id);
+  const label = (r: (typeof data.requests)[number]) => {
+    if (r.kind === 'start_time') return `${r.side === 'away' ? 'venku' : 'doma'} ${shortTime(r.time) || '?'}`;
+    if (r.kind === 'draw_no') {
+      const [x] = drawConstraints([{ ...r, status: 'new' }]);
+      return x?.kind ? describeDraw(x, name) : 'neurčeno';
+    }
+    return r.text;
+  };
   return (
     <div className="card">
       <div className="card-strip"><h2>Podklady pro losovací schůzi</h2>
         <span className="helper">Výchozí začátek {shortTime(c.default_start)} · v posledním kole bez výjimek</span></div>
       <div className="card-body table-scroll">
         <table className="table">
-          <thead><tr><th>#</th><th>Družstvo</th><th>Soupiska</th><th>Kapitán</th><th>Hrací místnost</th><th>Rozhodčí</th><th>Začátek</th><th>Požadavky</th></tr></thead>
+          <thead><tr><th style={{ width: 40 }}>#</th><th style={{ width: 280 }}>Družstvo</th><th>Požadavky</th></tr></thead>
           <tbody>
-            {teams.map((t, i) => {
-              const cap = t.contacts.find((x) => x.role === 'kapitan');
-              const refs = t.contacts.filter((x) => x.role === 'rozhodci' && x.name);
-              return (
-                <tr key={t.id} style={{ verticalAlign: 'top' }}>
-                  <td className="mono muted">{i + 1}.</td>
-                  <td><Link to={`../t/${t.id}`} style={{ fontWeight: 600 }}>{t.name}</Link></td>
-                  <td>{t.roster ? <span className="tag ok">{t.roster.players} hr.</span> : <span className="tag bad">chybí</span>}</td>
-                  <td>{cap?.name ? <>{cap.name}<div className="muted mono" style={{ fontSize: 12 }}>{cap.phone}</div></> : <span className="tag bad">chybí</span>}</td>
-                  <td style={{ maxWidth: 220 }}>{t.venue || <span className="tag warn">neuvedena</span>}</td>
-                  <td>{refs.length ? refs.map((r) => r.name).join(', ') : <span className="muted">—</span>}</td>
-                  <td className="mono" style={{ whiteSpace: 'nowrap' }}>
-                    {t.start_home && <div>doma {shortTime(t.start_home)}</div>}
-                    {t.start_away && <div>venku {shortTime(t.start_away)}</div>}
-                  </td>
-                  <td style={{ fontSize: 13 }}>
-                    {reqs(t.id).map((r) => (
-                      <div key={r.id}>
-                        <span className={`tag${r.status === 'accepted' ? ' ok' : r.status === 'rejected' ? ' bad' : ''}`}>{REQUEST_STATUS_LABEL[r.status]}</span>{' '}
-                        <span className="muted">{REQUEST_KIND_LABEL[r.kind]}:</span> {r.text}{r.decision && <span className="muted"> → {r.decision}</span>}
-                      </div>
-                    ))}
-                  </td>
-                </tr>
-              );
-            })}
+            {teams.map((t, i) => (
+              <tr key={t.id} style={{ verticalAlign: 'top' }}>
+                <td className="mono muted">{i + 1}.</td>
+                <td><Link to={`../t/${t.id}`} style={{ fontWeight: 600 }}>{t.name}</Link></td>
+                <td style={{ fontSize: 13.5 }}>
+                  {reqs(t.id).map((r) => (
+                    <div key={r.id}>
+                      <span className="muted">{REQUEST_KIND_LABEL[r.kind]}:</span> {label(r)}{' '}
+                      {r.kind !== 'start_time' && r.kind !== 'draw_no' ? null : r.text && <span className="muted">(„{r.text}“)</span>}{' '}
+                      <span className={`tag${r.status === 'accepted' ? ' ok' : r.status === 'rejected' ? ' bad' : ''}`}>{REQUEST_STATUS_LABEL[r.status]}</span>
+                      {r.decision && <span className="muted"> → {r.decision}</span>}
+                    </div>
+                  ))}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
         {general.length > 0 && (
@@ -168,114 +213,6 @@ function Documents({ teams, deadline }: { teams: TeamWithSummary[]; deadline: st
         {teams.some((t) => !t.club_code && !t.club_name) && (
           <p className="helper-text">Některá družstva nemají spárovaný oddíl — mohou chybět ve skupinách stejného oddílu.</p>
         )}
-      </div>
-    </div>
-  );
-}
-
-const EMPTY_FORM = { team_id: '', kind: 'alternate' as ConstraintKind, round: '', value: '', other_team_id: '', ext_name: '', ext_no: '', ext_teams: '', note: '' };
-
-function describe(c: DrawConstraint, name: (id: string | null) => string): string {
-  switch (c.kind) {
-    case 'draw_no': return `losovací číslo ${c.value}`;
-    case 'home': return `doma v ${c.round}. kole`;
-    case 'away': return `nehrát doma v ${c.round}. kole`;
-    case 'meet': return `vzájemný zápas s ${name(c.other_team_id)} v ${c.round}. kole`;
-    case 'alternate':
-    case 'same': {
-      const other = c.other_team_id ? name(c.other_team_id) : `${c.ext_name || 'družstvo jiné soutěže'} (č. ${c.ext_no} z ${c.ext_teams})`;
-      return c.kind === 'alternate' ? `protičíslo k ${other}` : `souběžně s ${other}`;
-    }
-  }
-}
-
-function Conditions({ teams, constraints, size, run, competitionId }: {
-  teams: TeamWithSummary[]; constraints: DrawConstraint[]; size: number; competitionId: string; run: (fn: () => Promise<unknown>) => Promise<void>;
-}) {
-  const { data } = useCompetition();
-  const [form, setForm] = useState(EMPTY_FORM);
-  const name = (id: string | null) => data.teams.find((t) => t.id === id)?.name ?? '?';
-  const k = form.kind;
-  const needsRound = k === 'home' || k === 'away' || k === 'meet';
-  const pattern = k === 'alternate' || k === 'same';
-  const ext = pattern && !form.other_team_id;
-  const ready = form.team_id && (k !== 'draw_no' || form.value) && (!needsRound || form.round) && (k !== 'meet' || form.other_team_id)
-    && (!ext || (form.ext_no && form.ext_teams));
-  const open = data.requests.filter((r) => r.kind !== 'start_time' && r.status !== 'rejected');
-
-  return (
-    <div className="card">
-      <div className="card-strip"><h2>Podmínky řízeného losování</h2>
-        <span className="helper">Strukturovaně zapsané požadavky; kontrolují se proti rozlosování.</span></div>
-      <div className="card-body">
-        {constraints.length ? (
-          <table className="table" style={{ marginBottom: 12 }}>
-            <tbody>
-              {constraints.map((x) => (
-                <tr key={x.id}>
-                  <td style={{ width: 260, fontWeight: 600 }}>{name(x.team_id)}</td>
-                  <td>{describe(x, name)}{x.note && <span className="muted"> — {x.note}</span>}</td>
-                  <td className="actions no-print" style={{ width: 40 }}>
-                    <button className="icon-btn" title="Smazat" onClick={() => run(() => api.delete(`/constraints/${x.id}`))}>✕</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : <p className="muted" style={{ marginTop: 0 }}>Žádné podmínky. Pravidlo o vzájemných zápasech stejného oddílu se kontroluje vždy.</p>}
-
-        {open.length > 0 && (
-          <div className="note no-print"><b>Požadavky k převedení na podmínky</b>
-            <ul className="list-plain">{open.map((r) => (
-              <li key={r.id}>{r.team_id ? name(r.team_id) : 'soutěž'}: „{r.text}“ <span className="muted">({REQUEST_STATUS_LABEL[r.status]})</span></li>
-            ))}</ul></div>
-        )}
-
-        <form className="no-print" onSubmit={(e) => {
-          e.preventDefault();
-          run(async () => { await api.post(`/competitions/${competitionId}/constraints`, form); setForm({ ...EMPTY_FORM, kind: form.kind }); });
-        }}>
-          <div className="grid-4">
-            <div className="field"><label>Družstvo</label>
-              <select className="input" value={form.team_id} onChange={(e) => setForm({ ...form, team_id: e.target.value })}>
-                <option value="">— vyberte —</option>
-                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select></div>
-            <div className="field"><label>Podmínka</label>
-              <select className="input" value={k} onChange={(e) => setForm({ ...form, kind: e.target.value as ConstraintKind })}>
-                {Object.entries(CONSTRAINT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select></div>
-            {k === 'draw_no' && (
-              <div className="field"><label>Číslo (1–{size})</label>
-                <input className="input mono" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value.replace(/\D/g, '') })} /></div>
-            )}
-            {needsRound && (
-              <div className="field"><label>Kolo (1–{size - 1})</label>
-                <input className="input mono" value={form.round} onChange={(e) => setForm({ ...form, round: e.target.value.replace(/\D/g, '') })} /></div>
-            )}
-            {(k === 'meet' || pattern) && (
-              <div className="field"><label>{k === 'meet' ? 'Soupeř' : 'Druhé družstvo'}</label>
-                <select className="input" value={form.other_team_id} onChange={(e) => setForm({ ...form, other_team_id: e.target.value })}>
-                  <option value="">{pattern ? '— z jiné soutěže —' : '— vyberte —'}</option>
-                  {teams.filter((t) => t.id !== form.team_id).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select></div>
-            )}
-          </div>
-          {ext && (
-            <div className="grid-4" style={{ marginTop: 14 }}>
-              <div className="field" style={{ gridColumn: 'span 2' }}><label>Družstvo jiné soutěže</label>
-                <input className="input" value={form.ext_name} placeholder="např. Kralupy A (KP)" onChange={(e) => setForm({ ...form, ext_name: e.target.value })} /></div>
-              <div className="field"><label>Jeho losovací číslo</label>
-                <input className="input mono" value={form.ext_no} onChange={(e) => setForm({ ...form, ext_no: e.target.value.replace(/\D/g, '') })} /></div>
-              <div className="field"><label>Počet družstev té soutěže</label>
-                <input className="input mono" value={form.ext_teams} onChange={(e) => setForm({ ...form, ext_teams: e.target.value.replace(/\D/g, '') })} /></div>
-            </div>
-          )}
-          <div className="row" style={{ marginTop: 14 }}>
-            <input className="input" style={{ flex: 1, minWidth: 240 }} placeholder="Poznámka (nepovinné)" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-            <button className="btn btn-primary" disabled={!ready}>Přidat podmínku</button>
-          </div>
-          {ext && <p className="helper-text">Kola druhé soutěže se porovnávají podle čísla kola (předpokládá se stejný kalendář, např. KP a RP).</p>}
-        </form>
       </div>
     </div>
   );

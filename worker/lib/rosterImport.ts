@@ -1,5 +1,6 @@
 // Roster import: draft (sscr-soupiska v1) → new roster version + team data (contacts, venue, …) + draw requests.
 // Always computable as a dry-run preview first; the UI shows it for manual verification.
+import { guessDrawKind } from '../../shared/draw/check';
 import { diffRosters } from '../../shared/roster/diff';
 import type { Contact, ContactRole, RosterImportPreview } from '../../shared/roster/importPreview';
 import { draftWarnings, type DraftContact, type RosterDraft } from '../../shared/roster/draft';
@@ -61,7 +62,7 @@ export async function previewRosterImport(db: D1Database, team: TeamRow & { boar
     // A preference with a time is a start-time request (home matches unless it says otherwise);
     // text without a time stays a generic request for the vedoucí to sort out.
     { kind: start ? 'start_time' : 'other', text: draft.extra.preferZacatek, time: start?.time ?? null, side: start?.side ?? null },
-    { kind: 'other', text: draft.extra.pozadavkyLosovani, time: null, side: null },
+    { kind: 'draw_no', text: draft.extra.pozadavkyLosovani, time: null, side: null },
   ].filter((r) => r.text && !existingReq.some((e) => fold(e.text) === fold(r.text)));
 
   return {
@@ -120,8 +121,8 @@ export async function applyRosterImport(
     }
   }
   for (const r of preview.newRequests) {
-    stmts.push(db.prepare(`INSERT INTO requests (competition_id, team_id, kind, text, time, side, source, created_at) VALUES (?, ?, ?, ?, ?, ?, 'roster', ?)`)
-      .bind(meta.competitionId, team.id, r.kind, r.text, r.time, r.side, t));
+    stmts.push(db.prepare(`INSERT INTO requests (competition_id, team_id, kind, text, time, side, draw_kind, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'roster', ?)`)
+      .bind(meta.competitionId, team.id, r.kind, r.text, r.time, r.side, r.kind === 'draw_no' ? guessDrawKind(r.text) : null, t));
   }
   stmts.push(db.prepare(
     `INSERT INTO import_log (owner_id, competition_id, source, filename, summary, created_at) VALUES (?, ?, ?, ?, ?, ?)`

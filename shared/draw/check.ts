@@ -6,18 +6,75 @@ import { bergerRounds, type Pairing } from './berger';
 
 export type ConstraintKind = 'draw_no' | 'home' | 'away' | 'meet' | 'alternate' | 'same';
 
+/** Structured part of a draw request (requests.kind = 'draw_no'); `kind` null = not specified yet. */
 export type DrawConstraint = {
   id: number;
   team_id: string;
-  kind: ConstraintKind;
+  kind: ConstraintKind | null;
   round: number | null;
   value: number | null;
   other_team_id: string | null;
   ext_name: string;
   ext_no: number | null;
   ext_teams: number | null;
-  note: string;
 };
+
+/** Request row fields needed for the draw (subset of the requests table). */
+export type DrawRequestFields = {
+  id: number; team_id: string | null; kind: string; status: string; round: number | null;
+  draw_kind: string | null; value: number | null; other_team_id: string | null; ext_name: string; ext_no: number | null; ext_teams: number | null;
+};
+
+/** Draw conditions = draw requests of a team that are not rejected. */
+export function drawConstraints(requests: DrawRequestFields[]): DrawConstraint[] {
+  return requests.filter((r) => r.kind === 'draw_no' && r.status !== 'rejected' && r.team_id).map((r) => ({
+    id: r.id, team_id: r.team_id!, kind: (CONSTRAINT_KINDS as string[]).includes(r.draw_kind ?? '') ? (r.draw_kind as ConstraintKind) : null,
+    round: r.round, value: r.value, other_team_id: r.other_team_id, ext_name: r.ext_name ?? '', ext_no: r.ext_no, ext_teams: r.ext_teams,
+  }));
+}
+
+/** What is still missing in the condition (null = complete and checkable). */
+export function missingSpec(c: DrawConstraint): string | null {
+  switch (c.kind) {
+    case null: return 'není určen druh podmínky';
+    case 'draw_no': return c.value ? null : 'chybí požadované číslo';  // out of range → simply never met
+    case 'home':
+    case 'away': return c.round ? null : 'chybí kolo';
+    case 'meet': return !c.other_team_id ? 'chybí soupeř' : !c.round ? 'chybí kolo' : null;
+    case 'alternate':
+    case 'same':
+      if (c.other_team_id) return null;
+      return !c.ext_teams && !c.ext_no ? 'chybí číslo a počet družstev druhé soutěže'
+        : !c.ext_no ? 'chybí losovací číslo družstva druhé soutěže' : !c.ext_teams ? 'chybí počet družstev druhé soutěže'
+        : c.ext_teams < 2 || c.ext_no > tableSize(c.ext_teams) ? 'číslo druhé soutěže mimo rozsah' : null;
+  }
+}
+
+/** Human description of the condition (Czech). */
+export function describeDraw(c: Omit<DrawConstraint, 'id' | 'team_id'>, name: (id: string | null) => string): string {
+  const q = (v: unknown) => (v == null || v === '' ? '?' : String(v));
+  switch (c.kind) {
+    case null: return 'neurčeno';
+    case 'draw_no': return `losovací číslo ${q(c.value)}`;
+    case 'home': return `doma v ${q(c.round)}. kole`;
+    case 'away': return `nehrát doma v ${q(c.round)}. kole`;
+    case 'meet': return `vzájemný zápas s ${c.other_team_id ? name(c.other_team_id) : '?'} v ${q(c.round)}. kole`;
+    case 'alternate':
+    case 'same': {
+      const other = c.other_team_id ? name(c.other_team_id)
+        : `${c.ext_name || 'družstvo jiné soutěže'} (č. ${q(c.ext_no)} z ${q(c.ext_teams)} družstev)`;
+      return c.kind === 'alternate' ? `protičíslo k ${other}` : `souběžně s ${other}`;
+    }
+  }
+}
+
+/** Guess the kind of a free-text draw request (e-soupiska); null when unclear. */
+export function guessDrawKind(text: string): ConstraintKind | null {
+  const f = fold(text);
+  if (/proti\s*cisl|opacn|stridav/.test(f)) return 'alternate';
+  if (/soubez/.test(f)) return 'same';
+  return null;
+}
 
 export type DrawTeam = { id: string; name: string; club_code: string | null; club_name: string; draw_no: number | null };
 
@@ -29,6 +86,8 @@ export type DrawInput = {
 };
 
 export type Violation = { teams: string[]; text: string; weight: number; constraintId?: number };
+
+export const CONSTRAINT_KINDS: ConstraintKind[] = ['draw_no', 'home', 'away', 'meet', 'alternate', 'same'];
 
 export const CONSTRAINT_LABEL: Record<ConstraintKind, string> = {
   draw_no: 'Losovací číslo',
@@ -119,7 +178,7 @@ export function violations(input: DrawInput, assign: Map<string, number>, empty:
   const out: Violation[] = [];
   for (const c of input.constraints) {
     const a = assign.get(c.team_id);
-    if (a == null) continue;
+    if (a == null || missingSpec(c)) continue;
     const who = name.get(c.team_id) ?? '?';
     const pa = T.homes(a, empty);
     switch (c.kind) {
@@ -154,9 +213,8 @@ export function violations(input: DrawInput, assign: Map<string, number>, empty:
           other = name.get(c.other_team_id) ?? '?';
           skip = T.meeting(a, b).round;
         } else {
-          if (!c.ext_no || !c.ext_teams) break;
-          const size = tableSize(c.ext_teams);
-          pb = table(size).homes(c.ext_no, c.ext_teams % 2 ? new Set([size]) : new Set());
+          const size = tableSize(c.ext_teams!);
+          pb = table(size).homes(c.ext_no!, c.ext_teams! % 2 ? new Set([size]) : new Set());
           other = `${c.ext_name || 'družstvo jiné soutěže'} (č. ${c.ext_no})`;
         }
         const bad: number[] = [];
@@ -202,6 +260,7 @@ export function violations(input: DrawInput, assign: Map<string, number>, empty:
 export function involvedTeams(input: DrawInput): Set<string> {
   const s = new Set<string>();
   for (const c of input.constraints) {
+    if (missingSpec(c)) continue;
     s.add(c.team_id);
     if (c.other_team_id) s.add(c.other_team_id);
   }
@@ -295,4 +354,21 @@ export function emptyNumbers(teams: DrawTeam[]): Set<number> {
   if (teams.some((t) => t.draw_no == null)) return new Set();
   const used = new Set(teams.map((t) => t.draw_no));
   return new Set(Array.from({ length: tableSize(teams.length) }, (_, i) => i + 1).filter((x) => !used.has(x)));
+}
+
+export type ConditionState = { state: 'ok' | 'violated' | 'unresolved' | 'waiting'; text: string };
+
+/** State of every condition for the current numbers: nevyřešeno (incomplete) / čeká na čísla / splněno / porušeno. */
+export function conditionStates(input: DrawInput, assign: Map<string, number>, empty: Set<number> = new Set()): Map<number, ConditionState> {
+  const viol = violations(input, assign, empty);
+  const out = new Map<number, ConditionState>();
+  for (const c of input.constraints) {
+    const miss = missingSpec(c);
+    if (miss) { out.set(c.id, { state: 'unresolved', text: `nevyřešeno — ${miss}` }); continue; }
+    const v = viol.find((x) => x.constraintId === c.id);
+    if (v) { out.set(c.id, { state: 'violated', text: v.text }); continue; }
+    const needs = [c.team_id, ...(c.kind === 'meet' || c.other_team_id ? [c.other_team_id] : [])];
+    out.set(c.id, needs.every((id) => id && assign.has(id)) ? { state: 'ok', text: 'splněno' } : { state: 'waiting', text: 'čeká na losovací čísla' });
+  }
+  return out;
 }

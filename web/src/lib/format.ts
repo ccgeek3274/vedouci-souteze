@@ -8,7 +8,7 @@ export const ROLE_LABEL: Record<string, string> = {
   kapitan: 'Kapitán', zastupce: 'Zástupce kapitána', komunikace: 'Komunikace', rozhodci: 'Rozhodčí',
 };
 export const REQUEST_KIND_LABEL: Record<string, string> = {
-  start_time: 'Začátek utkání', draw_no: 'Losovací číslo', date_change: 'Změna termínu', other: 'Jiný požadavek',
+  start_time: 'Začátek utkání', draw_no: 'Losování', date_change: 'Změna termínu', other: 'Jiný požadavek',
 };
 export const REQUEST_STATUS_LABEL: Record<string, string> = { new: 'Nový', accepted: 'Vyhověno', rejected: 'Zamítnuto' };
 

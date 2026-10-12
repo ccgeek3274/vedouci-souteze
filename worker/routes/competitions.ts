@@ -61,12 +61,12 @@ competitions.post('/', async (c) => {
   return c.json({ id }, 201);
 });
 
-// Full competition: fields, rounds, teams (+contacts, roster summary), requests, draw conditions.
+// Full competition: fields, rounds, teams (+contacts, roster summary), requests (incl. draw conditions).
 competitions.get('/:id', async (c) => {
   const comp = await ownedCompetition(c, c.req.param('id'));
   if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
   const db = c.env.DB;
-  const [rounds, teams, contacts, rosters, requests, constraints] = await db.batch([
+  const [rounds, teams, contacts, rosters, requests] = await db.batch([
     db.prepare('SELECT round, date, note FROM competition_rounds WHERE competition_id = ? ORDER BY round').bind(comp.id),
     db.prepare('SELECT * FROM teams WHERE competition_id = ? ORDER BY status, position').bind(comp.id),
     db.prepare(
@@ -80,7 +80,6 @@ competitions.get('/:id', async (c) => {
        WHERE t.competition_id = ? AND rv.version = (SELECT MAX(version) FROM roster_versions x WHERE x.team_id = rv.team_id)`
     ).bind(comp.id),
     db.prepare('SELECT * FROM requests WHERE competition_id = ? ORDER BY created_at').bind(comp.id),
-    db.prepare('SELECT * FROM draw_constraints WHERE competition_id = ? ORDER BY created_at, id').bind(comp.id),
   ]);
   const byTeam = (rows: any[]) => rows.reduce((m, r) => ((m[r.team_id] ??= []).push(r), m), {} as Record<string, any[]>);
   const contactsByTeam = byTeam(contacts.results);
@@ -94,7 +93,6 @@ competitions.get('/:id', async (c) => {
       const p = parseStartTime(r.text);
       return { ...r, time: p?.time ?? null, side: r.side ?? p?.side ?? 'home' };
     }),
-    constraints: constraints.results,
   });
 });
 

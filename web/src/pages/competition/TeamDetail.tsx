@@ -9,6 +9,7 @@ import type { Contact, RosterPlayer, RosterVersion, Team } from '../../lib/types
 import { useCompetition } from './CompetitionLayout';
 import { IssueList, useRosterCheck } from './RosterCheck';
 import { RosterEditor } from './RosterEditor';
+import { NewRequestForm, RequestTable } from './RequestItems';
 import { checkTeamRoster, checkedAt, competitionIssues, prepareCheck } from '../../lib/rosterCheck';
 import { strikeReason } from '../../../../shared/roster/verify';
 
@@ -82,6 +83,16 @@ export function TeamDetail() {
       <div className="crumbs"><Link to="../druzstva">← Družstva</Link></div>
       <TeamFields team={t} onSaved={refresh} />
       <Contacts teamId={t.id} contacts={data.contacts} onSaved={refresh} />
+      <div className="card">
+        <div className="card-strip"><h2>Požadavky</h2><span className="helper">začátky utkání, losování, termíny</span></div>
+        <div className="card-body table-scroll">
+          {comp.requests.some((r) => r.team_id === t.id)
+            ? <RequestTable requests={comp.requests.filter((r) => r.team_id === t.id)} showTeam={false} />
+            : <p className="muted" style={{ marginTop: 0 }}>Žádné požadavky.</p>}
+          <div className="section-title">Nový požadavek</div>
+          <NewRequestForm teamId={t.id} />
+        </div>
+      </div>
       <div className="card">
         <div className="card-strip">
           <h2>Soupiska</h2>

@@ -6,6 +6,7 @@ import { TEAM_FIELDS, TEAM_NUMERIC } from './competitions';
 import { normalizeDraft } from '../../shared/roster/draft';
 import { bestTeamMatch, teamNameScore } from '../../shared/text';
 import { normTime, parseStartTime, shortTime, type StartSide } from '../../shared/startTime';
+import { CONSTRAINT_KINDS, type ConstraintKind } from '../../shared/draw/check';
 import type { AppEnv } from '../types';
 
 const teams = new Hono<AppEnv>();
@@ -14,6 +15,29 @@ teams.use('*', authRequired);
 const ROLES: ContactRole[] = ['kapitan', 'zastupce', 'komunikace', 'rozhodci'];
 const REQUEST_KINDS = ['start_time', 'draw_no', 'date_change', 'other'];
 const REQUEST_STATUSES = ['new', 'accepted', 'rejected'];
+const DRAW_FIELDS = ['draw_kind', 'value', 'other_team_id', 'ext_name', 'ext_no', 'ext_teams'] as const;
+
+/**
+ * Structured fields of a draw request — all optional (specified during the meeting; incomplete = nevyřešeno).
+ * Returns an error text or null; normalizes `f` in place.
+ */
+async function checkDrawFields(c: any, competitionId: string, f: Record<string, unknown>): Promise<string | null> {
+  if ('draw_kind' in f) {
+    f.draw_kind = f.draw_kind || null;
+    if (f.draw_kind && !CONSTRAINT_KINDS.includes(f.draw_kind as ConstraintKind)) return 'Neplatný druh podmínky losování';
+  }
+  if ('other_team_id' in f) {
+    f.other_team_id = f.other_team_id || null;
+    if (f.other_team_id) {
+      const t = await ownedTeam(c, String(f.other_team_id));
+      if (!t || t.competition_id !== competitionId) return 'Druhé družstvo nepatří do této soutěže';
+    }
+  }
+  for (const k of ['value', 'ext_no', 'ext_teams', 'round'] as const) {
+    if (k in f && f[k] != null && !(Number(f[k]) >= 1 && Number(f[k]) <= 40)) return 'Čísla musí být kladná (kolo, číslo, počet družstev)';
+  }
+  return null;
+}
 
 // Team detail: fields, contacts, roster versions and the current roster.
 teams.get('/teams/:teamId', async (c) => {
@@ -239,8 +263,12 @@ function syncTeamStart(db: D1Database, before: RequestRow | null, after: Request
 teams.post('/competitions/:id/requests', async (c) => {
   const comp = await ownedCompetition(c, c.req.param('id'));
   if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
-  const body = await c.req.json<{ team_id?: string; kind?: string; text?: string; round?: number; time?: string; side?: string }>().catch(() => null);
+  const body = await c.req.json<{ team_id?: string; kind?: string; text?: string; round?: number; time?: string; side?: string } & Record<string, unknown>>().catch(() => null);
   if (!REQUEST_KINDS.includes(body?.kind ?? '')) return c.json({ error: 'Zadejte typ požadavku' }, 400);
+  const draw = body!.kind === 'draw_no' ? pick(body, [...DRAW_FIELDS, 'round'] as const, ['value', 'ext_no', 'ext_teams', 'round'] as const) : {};
+  const drawErr = await checkDrawFields(c, comp.id, draw);
+  if (drawErr) return c.json({ error: drawErr }, 400);
+  if (body!.kind === 'draw_no' && !body!.team_id) return c.json({ error: 'Požadavek na losování musí mít družstvo' }, 400);
   let time: string | null = null;
   let side: StartSide | null = null;
   let text = body?.text?.trim() ?? '';
@@ -252,13 +280,19 @@ teams.post('/competitions/:id/requests', async (c) => {
     if (!body!.team_id) return c.json({ error: 'Požadavek na začátek utkání musí mít družstvo' }, 400);
     text ||= describeStart(time, side);
   }
-  if (!text) return c.json({ error: 'Zadejte text požadavku' }, 400);
+  if (!text && body!.kind !== 'draw_no') return c.json({ error: 'Zadejte text požadavku' }, 400);
   if (body!.team_id) {
     const team = await ownedTeam(c, body!.team_id);
     if (!team || team.competition_id !== comp.id) return c.json({ error: 'Družstvo nepatří do této soutěže' }, 400);
   }
-  await c.env.DB.prepare('INSERT INTO requests (competition_id, team_id, kind, text, round, time, side, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(comp.id, body!.team_id ?? null, body!.kind, text, body!.round ?? null, time, side, 'manual', now()).run();
+  await c.env.DB.prepare(
+    `INSERT INTO requests (competition_id, team_id, kind, text, round, time, side, draw_kind, value, other_team_id, ext_name, ext_no, ext_teams, source, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    comp.id, body!.team_id ?? null, body!.kind, text, (draw.round as number | undefined) ?? null, time, side,
+    draw.draw_kind ?? null, draw.value ?? null, draw.other_team_id ?? null, draw.ext_name ?? '', draw.ext_no ?? null, draw.ext_teams ?? null,
+    'manual', now(),
+  ).run();
   return c.json({ ok: true }, 201);
 });
 
@@ -271,7 +305,11 @@ async function ownedRequest(c: any, id: string): Promise<RequestRow | null> {
 teams.patch('/requests/:reqId', async (c) => {
   const before = await ownedRequest(c, c.req.param('reqId'));
   if (!before) return c.json({ error: 'Požadavek nenalezen' }, 404);
-  const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null), ['kind', 'text', 'round', 'status', 'decision', 'time', 'side'] as const, ['round'] as const);
+  const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null),
+    ['kind', 'text', 'round', 'status', 'decision', 'time', 'side', ...DRAW_FIELDS] as const, ['round', 'value', 'ext_no', 'ext_teams'] as const);
+  const drawErr = await checkDrawFields(c, before.competition_id, f);
+  if (drawErr) return c.json({ error: drawErr }, 400);
+  if (f.kind === 'draw_no' && !before.team_id) return c.json({ error: 'Požadavek na losování musí mít družstvo' }, 400);
   if ('kind' in f && !REQUEST_KINDS.includes(String(f.kind))) return c.json({ error: 'Neplatný typ' }, 400);
   if ('status' in f && !REQUEST_STATUSES.includes(String(f.status))) return c.json({ error: 'Neplatný stav' }, 400);
   if ('side' in f && f.side !== 'home' && f.side !== 'away') return c.json({ error: 'Neplatná strana (home/away)' }, 400);

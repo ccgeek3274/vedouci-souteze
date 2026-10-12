@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { emptyNumbers, fixtures, numberProblems, sameClubGroups, suggestNumbers, violations, type DrawConstraint, type DrawInput, type DrawTeam } from '../draw/check';
+import { conditionStates, guessDrawKind, emptyNumbers, fixtures, numberProblems, sameClubGroups, suggestNumbers, violations, type DrawConstraint, type DrawInput, type DrawTeam } from '../draw/check';
 
 const team = (id: string, club: string, draw_no: number | null = null): DrawTeam => ({ id, name: id, club_code: club, club_name: '', draw_no });
 const con = (c: Partial<DrawConstraint> & Pick<DrawConstraint, 'team_id' | 'kind'>): DrawConstraint =>
-  ({ id: 1, round: null, value: null, other_team_id: null, ext_name: '', ext_no: null, ext_teams: null, note: '', ...c });
+  ({ id: 1, round: null, value: null, other_team_id: null, ext_name: '', ext_no: null, ext_teams: null, ...c });
 // 10 rounds of RPB 2026/27; round 4 = 6. 12. 2026, round 5 = 10. 1. 2027.
 const DATES = ['2026-10-18', '2026-11-08', '2026-11-22', '2026-12-06', '2027-01-10', '2027-01-24', '2027-02-07', '2027-02-21', '2027-03-14'];
 const assignOf = (teams: DrawTeam[]) => new Map(teams.filter((t) => t.draw_no != null).map((t) => [t.id, t.draw_no!]));
@@ -55,5 +55,23 @@ describe('draw checks', () => {
     expect(f).toHaveLength(5);
     expect(f[0][0]).toEqual({ round: 1, board: 1, home: null, away: 'T5' }); // 1–6: T5 has a bye
     expect(numberProblems([team('a', 'x', 3), team('b', 'y', 3), team('c', 'z', 9)])).toEqual(['Číslo 3 má a i b', 'c: číslo 9 mimo rozsah 1–4']);
+  });
+  it('condition states: incomplete requests are unresolved', () => {
+    const half = teams.map((t) => ({ ...t, draw_no: t.id === 'T2' ? null : t.draw_no }));
+    const input: DrawInput = {
+      teams: half, roundDates: DATES, deadline: null, constraints: [
+        con({ id: 1, team_id: 'T1', kind: 'alternate', ext_name: 'Kralupy A' }),
+        con({ id: 2, team_id: 'T1', kind: null }),
+        con({ id: 3, team_id: 'T1', kind: 'same', other_team_id: 'T2' }),
+        con({ id: 4, team_id: 'T1', kind: 'home', round: 1 }),
+      ],
+    };
+    const st = conditionStates(input, assignOf(half));
+    expect(st.get(1)).toEqual({ state: 'unresolved', text: 'nevyřešeno — chybí číslo a počet družstev druhé soutěže' });
+    expect(st.get(2)!.state).toBe('unresolved');
+    expect(st.get(3)!.state).toBe('waiting');
+    expect(st.get(4)!.state).toBe('ok');
+    expect(guessDrawKind('protičíslo ke Kralupy A (KP)')).toBe('alternate');
+    expect(guessDrawKind('jsou v souvislosti s losováním KP')).toBeNull();
   });
 });
