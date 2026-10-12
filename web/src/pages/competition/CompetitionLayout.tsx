@@ -25,17 +25,18 @@ export function CompetitionLayout() {
 
   return (
     <>
-      <div className="crumbs"><Link to="/">Soutěže</Link> / {c.season}</div>
+      <div className="crumbs no-print"><Link to="/">Soutěže</Link> / {c.season}</div>
       <h2 className="page-title">{c.name} <span style={{ color: 'var(--subtitle)' }}>{c.short}</span></h2>
       <p className="page-sub">
         {LEVEL_LABEL[c.level] ?? c.level} · {c.season} · {active.length} družstev · {c.boards} šachovnic · fáze: {PHASE_LABEL[c.phase] ?? c.phase}
       </p>
-      <nav className="tabs">
+      <nav className="tabs no-print">
         <NavLink to="" end>Přehled</NavLink>
         <NavLink to="druzstva">Družstva</NavLink>
         <NavLink to="soupisky">Import soupisek</NavLink>
         <NavLink to="kontrola">Kontrola soupisek</NavLink>
         <NavLink to="pozadavky">Požadavky{newRequests ? ` (${newRequests})` : ''}</NavLink>
+        <NavLink to="losovani">Losování</NavLink>
       </nav>
       <Outlet context={{ data, refresh } satisfies CompetitionCtx} />
     </>

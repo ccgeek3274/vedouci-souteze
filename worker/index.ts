@@ -7,6 +7,7 @@ import { teams } from './routes/teams';
 import { imports } from './routes/imports';
 import { tokens } from './routes/tokens';
 import { registry } from './routes/registry';
+import { draw } from './routes/draw';
 import type { AppEnv } from './types';
 
 // Only /api/* reaches the Worker (assets.run_worker_first); everything else is the SPA.
@@ -21,6 +22,7 @@ app.route('/import', imports);
 app.route('/tokens', tokens);
 app.route('/registry', registry);
 app.route('/', teams);
+app.route('/', draw);
 
 app.notFound((c) => c.json({ error: 'Nenalezeno' }, 404));
 app.onError((err, c) => {

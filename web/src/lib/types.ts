@@ -1,4 +1,5 @@
 import type { CzCheck, VCheck } from '../../../shared/roster/verify';
+import type { DrawConstraint } from '../../../shared/draw/check';
 
 export type Competition = {
   id: string; season: string; region: string; level: string; group_code: string; short: string; name: string;
@@ -25,7 +26,7 @@ export type Request = {
   status: 'new' | 'accepted' | 'rejected'; decision: string; source: string; created_at: number;
   time: string | null; side: 'home' | 'away' | null;
 };
-export type CompetitionDetail = { competition: Competition; rounds: Round[]; teams: TeamWithSummary[]; requests: Request[] };
+export type CompetitionDetail = { competition: Competition; rounds: Round[]; teams: TeamWithSummary[]; requests: Request[]; constraints: DrawConstraint[] };
 export type RosterPlayer = {
   id: number; position: number; name: string; birth_year: number | null; lok: number | null; fide: number | null;
   flags: string; base: number; guest_permit: number; struck: number; struck_reason: string;

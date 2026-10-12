@@ -58,7 +58,7 @@ Viz plán; zavádí se postupně migracemi:
 | M4 | Import rozpisu / rozdělení (JSON schéma, API s dry-run, skill `import-rozpis`) | hotovo |
 | M5 | Import soupisek (xlsx e-soupiska, JSON draft v1, skill `import-soupiska`), verze, požadavky | hotovo |
 | M6 | Verifikace soupisek proti chess.cz, nedostatky, vyškrtnutí | hotovo (viz `feat-kontrola-soupisek.md`) |
-| M7 | Losovací schůze: přehledy, Berger, kontroly pravidel, řízené losování | |
+| M7 | Losovací schůze: přehledy, Berger, kontroly pravidel, řízené losování | hotovo, k doladění (viz `feat-losovani.md`) |
 | M8 | Úvodní zpravodaj (předběžný / definitivní), DOCX + PDF, verze | |
 | M9 | Zpravodaje z kol, snapshoty pořadí, poznámky | |
 | Fáze 2 | Export pro Swiss-Manager, úprava swiss-manager-automat | |
