@@ -46,5 +46,5 @@ Kalendář (volitelně, na nové stránce).
 
 ## Zobrazení označení hráčů
 - V celé aplikaci (detail družstva, náhled importu, editor soupisky) jsou tři samostatné sloupce ve stálém pořadí
-  **Z | K/ZK | H/V/C** (nadpis „Z“, nad K/ZK a H/V/C společný „Označení“; sloupce mají pevnou šířku, aby prázdný K/ZK nesplynul s H/V/C) (`web/src/components/FlagCells.tsx`, `flagParts` v `shared/roster/draft.ts`).
+  **Z | H/V/C | K/ZK** (nadpis „Z“, nad H/V/C a K/ZK společný „Označení“; sloupce mají pevnou šířku, aby se prázdné sloupce nesmrštily) (`web/src/components/FlagCells.tsx`, `flagParts` v `shared/roster/draft.ts`).
 - Ve zpravodaji (náhled, DOCX, PDF) samostatné sloupce **Z | P | K**: P = písmeno H/V/C, K = kapitán K/ZK.

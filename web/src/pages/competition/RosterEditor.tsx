@@ -3,7 +3,7 @@ import { api, apiErrorText } from '../../lib/api';
 import type { RosterPlayer } from '../../lib/types';
 import { emptyExtra, expectedBase, maxLetters, toggleFlag, type RosterDraft } from '../../../../shared/roster/draft';
 
-const FLAG_COLS = [['K', 'ZK'], ['H', 'V', 'C']]; // own columns after Z
+const FLAG_COLS = [['H', 'V', 'C'], ['K', 'ZK']]; // own columns after Z
 
 type Row = { key: number; jmeno: string; rok: string; lok: string; fide: string; ozn: string; z: boolean };
 

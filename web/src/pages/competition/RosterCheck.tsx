@@ -154,8 +154,8 @@ export function IssueList({ issues }: { issues: Issue[] }) {
   );
 }
 
-/** Z, K/ZK, H/V/C — always in this order. */
-const flagText = (p: RosterPlayer) => { const f = flagParts(p.flags); return [p.base ? 'Z' : '', f.cap, f.letter].filter(Boolean).join(' '); };
+/** Z, H/V/C, K/ZK — always in this order. */
+const flagText = (p: RosterPlayer) => { const f = flagParts(p.flags); return [p.base ? 'Z' : '', f.letter, f.cap].filter(Boolean).join(' '); };
 
 function IssueRow({ player: p, issues, onChanged }: { player: RosterPlayer; issues: Issue[]; onChanged: () => Promise<unknown> }) {
   const reason = strikeReason(issues);
