@@ -4,7 +4,7 @@ import { api, apiErrorText } from '../../lib/api';
 import { REQUEST_KIND_LABEL, REQUEST_STATUS_LABEL } from '../../lib/format';
 import type { Request } from '../../lib/types';
 import { normTime, shortTime } from '../../../../shared/startTime';
-import { CONSTRAINT_LABEL, describeDraw, drawConstraints, tableSize, type ConditionState, type ConstraintKind } from '../../../../shared/draw/check';
+import { CONSTRAINT_LABEL, describeDraw, drawConstraints, manualResolution, tableSize, type ConditionState, type ConstraintKind } from '../../../../shared/draw/check';
 import { useCompetition } from './CompetitionLayout';
 
 // Requests shared by the Požadavky tab, the team page and the Losování tab: read-only rows with an "Upravit"
@@ -18,6 +18,7 @@ const STATUS_CLASS: Record<string, string> = { new: '', accepted: 'ok', rejected
 type Draft = {
   team_id: string; kind: string; status: string; text: string; decision: string; time: string; side: string;
   draw_kind: string; value: string; round: string; other_team_id: string; ext_name: string; ext_no: string; ext_teams: string;
+  resolved: boolean;
 };
 const str = (v: number | null | undefined) => (v == null ? '' : String(v));
 const num = (v: string) => (v ? Number(v) : null);
@@ -26,24 +27,30 @@ function toDraft(r: Request): Draft {
   return {
     team_id: r.team_id ?? '', kind: r.kind, status: r.status, text: r.text, decision: r.decision, time: r.time ?? '', side: r.side ?? 'home',
     draw_kind: r.draw_kind ?? '', value: str(r.value), round: str(r.round), other_team_id: r.other_team_id ?? '',
-    ext_name: r.ext_name ?? '', ext_no: str(r.ext_no), ext_teams: str(r.ext_teams),
+    ext_name: r.ext_name ?? '', ext_no: str(r.ext_no), ext_teams: str(r.ext_teams), resolved: !!r.resolved,
   };
 }
 const EMPTY: Draft = {
   team_id: '', kind: 'draw_no', status: 'new', text: '', decision: '', time: '10:00', side: 'home',
-  draw_kind: '', value: '', round: '', other_team_id: '', ext_name: '', ext_no: '', ext_teams: '',
+  draw_kind: '', value: '', round: '', other_team_id: '', ext_name: '', ext_no: '', ext_teams: '', resolved: false,
 };
 
 /** API body from the form. */
 function toBody(d: Draft) {
   return {
-    team_id: d.team_id || undefined, kind: d.kind, status: d.status, text: d.text.trim(), decision: d.decision.trim(),
+    team_id: d.team_id || undefined, kind: d.kind, status: d.status, text: d.text.trim(), decision: d.decision.trim(), resolved: d.resolved ? 1 : 0,
     ...(d.kind === 'start_time' ? { time: d.time || null, side: d.side } : {}),
     ...(d.kind === 'draw_no' ? {
       draw_kind: d.draw_kind || null, value: num(d.value), round: num(d.round), other_team_id: d.other_team_id || null,
       ext_name: d.ext_name.trim(), ext_no: num(d.ext_no), ext_teams: num(d.ext_teams),
     } : {}),
   };
+}
+
+/** State of a request that cannot be checked automatically (null = checked automatically or rejected). */
+export function manualState(r: Request): ConditionState | null {
+  if (!manualResolution(r) || r.status === 'rejected') return null;
+  return r.resolved ? { state: 'ok', text: 'vyřešeno' } : { state: 'unresolved', text: 'nevyřešeno' };
 }
 
 /** One-line description of a request. */
@@ -135,6 +142,13 @@ function RequestFields({ d, set, withTeam, withStatus }: { d: Draft; set: (p: Pa
       <div className="field full"><label>{d.kind === 'start_time' || d.kind === 'draw_no' ? 'Původní text / poznámka' : 'Text požadavku'}</label>
         <input className="input input-sm" value={d.text} onChange={(e) => set({ text: e.target.value })}
           placeholder={d.kind === 'draw_no' ? 'např. protičíslo ke Kralupy A (KP)' : d.kind === 'start_time' ? 'nepovinné' : 'např. přeložení 3. kola'} /></div>
+      {withStatus && manualResolution({ kind: d.kind, draw_kind: d.draw_kind || null }) && (
+        <div className="field full"><label>Vyřešení (nelze ověřit automaticky)</label>
+          <div className="segmented">
+            <button type="button" className={!d.resolved ? 'active warn' : ''} onClick={() => set({ resolved: false })}>Nevyřešeno</button>
+            <button type="button" className={d.resolved ? 'active ok' : ''} onClick={() => set({ resolved: true })}>Vyřešeno</button>
+          </div></div>
+      )}
       {withStatus && (
         <div className="field full"><label>Rozhodnutí / poznámka vedoucího</label>
           <input className="input input-sm" value={d.decision} onChange={(e) => set({ decision: e.target.value })} /></div>
@@ -192,7 +206,7 @@ export function RequestTable({ requests, showTeam = true, showKind = true, state
     <div className="req-list">
       {error && <div className="alert">{error}</div>}
       {requests.map((r) => {
-        const st = states?.get(r.id);
+        const st = states?.get(r.id) ?? manualState(r);
         const summary = requestSummary(r, name);
         return (
           <div key={r.id} className={`req-row${showTeam ? ' with-team' : ''}`}>

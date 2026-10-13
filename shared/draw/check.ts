@@ -17,19 +17,21 @@ export type DrawConstraint = {
   ext_name: string;
   ext_no: number | null;
   ext_teams: number | null;
+  resolved?: boolean;      // manual resolution (only for a condition of unspecified kind)
 };
 
 /** Request row fields needed for the draw (subset of the requests table). */
 export type DrawRequestFields = {
   id: number; team_id: string | null; kind: string; status: string; round: number | null;
   draw_kind: string | null; value: number | null; other_team_id: string | null; ext_name: string; ext_no: number | null; ext_teams: number | null;
+  resolved?: number;
 };
 
 /** Draw conditions = draw requests of a team that are not rejected. */
 export function drawConstraints(requests: DrawRequestFields[]): DrawConstraint[] {
   return requests.filter((r) => r.kind === 'draw_no' && r.status !== 'rejected' && r.team_id).map((r) => ({
     id: r.id, team_id: r.team_id!, kind: (CONSTRAINT_KINDS as string[]).includes(r.draw_kind ?? '') ? (r.draw_kind as ConstraintKind) : null,
-    round: r.round, value: r.value, other_team_id: r.other_team_id, ext_name: r.ext_name ?? '', ext_no: r.ext_no, ext_teams: r.ext_teams,
+    round: r.round, value: r.value, other_team_id: r.other_team_id, ext_name: r.ext_name ?? '', ext_no: r.ext_no, ext_teams: r.ext_teams, resolved: !!r.resolved,
   }));
 }
 
@@ -109,18 +111,40 @@ export function defaultDeadline(season: string): string {
   return `${parseInt(season, 10)}-12-31`;
 }
 
-/** Club key of a team: chess.cz code, else the folded club name (teams of one club share it). */
-export function clubKey(t: Pick<DrawTeam, 'club_code' | 'club_name'>): string {
-  return t.club_code ? `#${t.club_code}` : fold(t.club_name).replace(/[^a-z0-9]+/g, ' ').trim();
+/** Club name without legal forms and punctuation ("Šachklub města Dobrovice z.s." → "sachklub mesta dobrovice"). */
+export function clubNameKey(name: string): string {
+  return fold(name).replace(/\b(z\s*\.?\s*s|o\s*\.?\s*s|spolek|zapsany spolek)\b\.?/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-/** Groups of teams of the same club (≥ 2). */
+/** Team name without the team letter ("Šachklub města Dobrovice D" → "sachklub mesta dobrovice"). */
+const teamClubKey = (name: string) => fold(name).replace(/\s+[a-z]$/, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Groups of teams of the same club (≥ 2). Teams belong together when they share the chess.cz club code,
+ * the club name (without legal form) or the team name without its letter — club codes are often missing
+ * and club names differ between e-soupisky ("… z.s."). Two different club codes are never merged.
+ */
 export function sameClubGroups<T extends DrawTeam>(teams: T[]): T[][] {
-  const by = new Map<string, T[]>();
-  for (const t of teams) {
-    const k = clubKey(t);
-    if (k) by.set(k, [...(by.get(k) ?? []), t]);
+  const parent = teams.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const codes = (i: number) => new Set(teams.map((t, j) => (find(j) === find(i) ? t.club_code : null)).filter(Boolean));
+  const union = (i: number, j: number) => {
+    const [a, b] = [find(i), find(j)];
+    if (a === b) return;
+    const all = new Set([...codes(a), ...codes(b)]);
+    if (all.size > 1) return; // different chess.cz clubs
+    parent[b] = a;
+  };
+  const keys = (t: T) => [t.club_code ? `#${t.club_code}` : '', clubNameKey(t.club_name), teamClubKey(t.name)].filter(Boolean);
+  for (let i = 0; i < teams.length; i++) {
+    for (let j = i + 1; j < teams.length; j++) {
+      const ki = keys(teams[i]);
+      if (keys(teams[j]).some((k) => ki.includes(k))) union(i, j);
+    }
   }
+  const by = new Map<number, T[]>();
+  teams.forEach((t, i) => by.set(find(i), [...(by.get(find(i)) ?? []), t]));
   return [...by.values()].filter((g) => g.length > 1);
 }
 
@@ -364,6 +388,7 @@ export function conditionStates(input: DrawInput, assign: Map<string, number>, e
   const out = new Map<number, ConditionState>();
   for (const c of input.constraints) {
     const miss = missingSpec(c);
+    if (!c.kind && c.resolved) { out.set(c.id, { state: 'ok', text: 'vyřešeno (ručně)' }); continue; }
     if (miss) { out.set(c.id, { state: 'unresolved', text: `nevyřešeno — ${miss}` }); continue; }
     const v = viol.find((x) => x.constraintId === c.id);
     if (v) { out.set(c.id, { state: 'violated', text: v.text }); continue; }
@@ -371,4 +396,9 @@ export function conditionStates(input: DrawInput, assign: Map<string, number>, e
     out.set(c.id, needs.every((id) => id && assign.has(id)) ? { state: 'ok', text: 'splněno' } : { state: 'waiting', text: 'čeká na losovací čísla' });
   }
   return out;
+}
+
+/** Requests whose fulfilment cannot be checked automatically — resolved by a manual switch. */
+export function manualResolution(r: { kind: string; draw_kind: string | null }): boolean {
+  return r.kind === 'other' || r.kind === 'date_change' || (r.kind === 'draw_no' && !r.draw_kind);
 }

@@ -306,7 +306,8 @@ teams.patch('/requests/:reqId', async (c) => {
   const before = await ownedRequest(c, c.req.param('reqId'));
   if (!before) return c.json({ error: 'Požadavek nenalezen' }, 404);
   const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null),
-    ['kind', 'text', 'round', 'status', 'decision', 'time', 'side', ...DRAW_FIELDS] as const, ['round', 'value', 'ext_no', 'ext_teams'] as const);
+    ['kind', 'text', 'round', 'status', 'decision', 'time', 'side', 'resolved', ...DRAW_FIELDS] as const, ['round', 'value', 'ext_no', 'ext_teams', 'resolved'] as const);
+  if ('resolved' in f) f.resolved = f.resolved ? 1 : 0;
   const drawErr = await checkDrawFields(c, before.competition_id, f);
   if (drawErr) return c.json({ error: drawErr }, 400);
   if (f.kind === 'draw_no' && !before.team_id) return c.json({ error: 'Požadavek na losování musí mít družstvo' }, 400);

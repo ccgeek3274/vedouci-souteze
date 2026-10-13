@@ -26,6 +26,7 @@ export type Request = {
   time: string | null; side: 'home' | 'away' | null;
   // draw request (kind 'draw_no'): structured condition, all optional
   draw_kind: string | null; value: number | null; other_team_id: string | null; ext_name: string; ext_no: number | null; ext_teams: number | null;
+  resolved: number; // manual resolution of requests that cannot be checked automatically
 };
 export type CompetitionDetail = { competition: Competition; rounds: Round[]; teams: TeamWithSummary[]; requests: Request[] };
 export type RosterPlayer = {

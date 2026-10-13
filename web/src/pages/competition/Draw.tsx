@@ -9,7 +9,7 @@ import {
 } from '../../../../shared/draw/check';
 import { matchStart, shortTime } from '../../../../shared/startTime';
 import { useCompetition } from './CompetitionLayout';
-import { requestSummary, RequestTable } from './RequestItems';
+import { manualState, requestSummary, RequestTable } from './RequestItems';
 
 // Draw meeting (M7). Workflow: numbers start empty; requests (start times, draw conditions) are decided and
 // completed during the meeting, numbers are filled in one by one as teams are drawn (each saved at once).
@@ -50,6 +50,7 @@ export function Draw() {
   const otherReqs = data.requests.filter((r) => r.kind !== 'start_time' && r.kind !== 'draw_no');
   const pairs = sameClubGroups(teams).flatMap((g) => g.flatMap((x, i) => g.slice(i + 1).map((y) => [x, y] as const)));
   const unresolved = [...states.values()].filter((x) => x.state === 'unresolved').length;
+  const otherUnresolved = otherReqs.filter((r) => manualState(r)?.state === 'unresolved').length;
 
   return (
     <>
@@ -72,7 +73,7 @@ export function Draw() {
 
       <div className="card no-print">
         <div className="card-strip"><h2>Požadavky na losování</h2>
-          <span className="helper">Upřesněte během schůze; neúplné = nevyřešeno{unresolved ? ` (${unresolved})` : ''}. Zamítnuté se nekontrolují.</span></div>
+          <span className="helper">Upřesněte během schůze; neúplné = nevyřešeno{unresolved ? ` (${unresolved})` : ''}; bez určeného druhu lze v úpravě označit Vyřešeno. Zamítnuté se nekontrolují.</span></div>
         <div className="card-body table-scroll">
           {drawReqs.length ? <RequestTable requests={drawReqs} states={states} showKind={false} /> : <p className="muted" style={{ marginTop: 0 }}>Žádné požadavky na losování (přidávají se na záložce Požadavky nebo u družstva).</p>}
           <div className="section-title">Pravidlo: družstva stejného oddílu se utkají do {czDate(deadline)}</div>
@@ -95,7 +96,8 @@ export function Draw() {
 
       {otherReqs.length > 0 && (
         <div className="card no-print">
-          <div className="card-strip"><h2>Ostatní požadavky</h2></div>
+          <div className="card-strip"><h2>Ostatní požadavky</h2>
+            <span className="helper">Splnění nejde ověřit automaticky — označte Vyřešeno v úpravě{otherUnresolved ? ` (nevyřešeno ${otherUnresolved})` : ''}.</span></div>
           <div className="card-body table-scroll"><RequestTable requests={otherReqs} /></div>
         </div>
       )}

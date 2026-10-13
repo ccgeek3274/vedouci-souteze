@@ -74,4 +74,16 @@ describe('draw checks', () => {
     expect(guessDrawKind('protičíslo ke Kralupy A (KP)')).toBe('alternate');
     expect(guessDrawKind('jsou v souvislosti s losováním KP')).toBeNull();
   });
+  it('same club without club codes (names differ by legal form / team letter)', () => {
+    const t = (name: string, club_code: string | null, club_name: string): DrawTeam => ({ id: name, name, club_code, club_name, draw_no: null });
+    const g = sameClubGroups([
+      t('Šachklub města Dobrovice E', '12302', 'Šachklub města Dobrovice'),
+      t('Šachklub města Dobrovice D', null, 'Šachklub města Dobrovice z.s.'),
+      t('TJ Kralupy nad Vltavou C', null, 'TJ KRALUPY, z.s.'),
+      t('Šachový klub Bakov nad Jizerou C', null, ''),
+      t('Sokol A', '1', 'Sokol'),
+      t('Sokol B', '2', 'Sokol'),
+    ]);
+    expect(g.map((x) => x.map((y) => y.name))).toEqual([['Šachklub města Dobrovice E', 'Šachklub města Dobrovice D']]);
+  });
 });

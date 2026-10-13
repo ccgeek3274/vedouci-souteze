@@ -15,7 +15,8 @@ požadavky na losování se upřesňují) a čísla se doplňují postupně, jak
 
 ## Podklady (tisknutelné, tlačítko Tisk / PDF)
 Pořadí, družstvo, požadavky (druh, upřesnění, původní text, stav, rozhodnutí). Požadavky k celé soutěži,
-skupiny družstev stejného oddílu (podle `club_code`, jinak názvu oddílu).
+skupiny družstev stejného oddílu: stejné `club_code`, nebo stejný název oddílu bez právní formy („z.s.“),
+nebo stejný název družstva bez písmene; dvě různá čísla oddílu se nikdy nespojí (`sameClubGroups`).
 
 ## Požadavky na losování (`requests.kind = 'draw_no'`, migrace 0009)
 Jedna entita s požadavky (žádná zvláštní tabulka podmínek — původní `draw_constraints` z 0008 převedeny a zrušeny).
@@ -32,6 +33,8 @@ a do kontrol ani řízeného losování se nezapočítá. Zamítnutý se nekontr
   U dvojice ze stejné skupiny se kolo jejich vzájemného zápasu nepočítá.
 - Import e-soupisky: „Požadavky na losování“ → požadavek na losování; text s „protičíslo“ předvyplní druh `alternate`.
 - Stav ve vyhodnocení: nevyřešeno / čeká na losovací čísla / splněno / porušeno.
+- Co nejde ověřit automaticky (jiný požadavek, změna termínu, losování bez určeného druhu) má v úpravě přepínač
+  Nevyřešeno / Vyřešeno (`requests.resolved`, migrace 0010). Zamítnuté se jako nevyřešené neukazují.
 - Pravidlo vždy: družstva stejného oddílu se utkají do `mutual_deadline` (výchozí 31. 12. prvního roku sezóny).
 
 ## Řízené losování
