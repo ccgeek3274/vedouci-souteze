@@ -15,6 +15,7 @@ import { Requests } from './pages/competition/Requests';
 import { TeamDetail } from './pages/competition/TeamDetail';
 import { RosterCheck } from './pages/competition/RosterCheck';
 import { Draw } from './pages/competition/Draw';
+import { Bulletin } from './pages/competition/Bulletin';
 
 export function App() {
   return (
@@ -31,6 +32,7 @@ export function App() {
             <Route path="kontrola" element={<RosterCheck />} />
             <Route path="pozadavky" element={<Requests />} />
             <Route path="losovani" element={<Draw />} />
+            <Route path="zpravodaj" element={<Bulletin />} />
             <Route path="t/:teamId" element={<TeamDetail />} />
           </Route>
           <Route path="/tokeny" element={<Tokens />} />

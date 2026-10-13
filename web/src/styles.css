@@ -192,3 +192,62 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
   .card { break-inside: avoid; border-color: #000; }
   .page-title, .page-sub { color: #000; }
 }
+
+/* Úvodní zpravodaj (M8): toolbar, sources and the document preview (DXA/15 px, like uvodni-zpravodaj) */
+@font-face { font-family: DocFont; src: local('Calibri'), local('Carlito'), url(/fonts/Carlito-Regular.ttf) format('truetype'); }
+@font-face { font-family: DocFont; font-weight: bold; src: local('Calibri Bold'), local('Carlito Bold'), url(/fonts/Carlito-Bold.ttf) format('truetype'); }
+@font-face { font-family: DocFont; font-style: italic; src: local('Calibri Italic'), local('Carlito Italic'), url(/fonts/Carlito-Italic.ttf) format('truetype'); }
+.bulletin-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.bulletin-bar .spacer { flex: 1; }
+.field-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }
+.source-list { list-style: none; padding: 0; margin: 0 0 8px; }
+.source-list li { margin: 0 0 10px; }
+.source-list .tag { min-width: 78px; justify-content: center; margin-right: 8px; }
+.source-list .confirm { display: flex; gap: 6px; align-items: flex-start; margin: 6px 0 0 86px; font-size: 13.5px; }
+.source-list .muted { margin-left: 86px; font-size: 13px; }
+
+.doc-wrap { overflow-x: auto; margin-top: 18px; }
+.doc { width: 794px; margin: 0 auto; background: #fff; color: #000; padding: 45px 26px 60px; box-shadow: 0 2px 14px rgba(0,0,0,.35);
+  font-family: DocFont, Calibri, Carlito, sans-serif; font-size: 16px; line-height: 1.22; }
+.doc-hdr { text-align: right; font-size: 12px; margin-bottom: 18px; }
+.d-title { text-align: center; font-size: 26.7px; font-weight: 700; margin-bottom: 8px; }
+.d-sub { text-align: center; font-size: 18.7px; margin: 4px 0; }
+.d-h { font-size: 18.7px; font-weight: 700; margin: 22px 0 8px; }
+.d-p { margin: 0 0 6px; }
+.d-p ul { margin: 4px 0 8px; padding-left: 22px; }
+.d-note { font: 12.5px var(--sans); color: var(--muted); margin: 0 0 8px; display: flex; gap: 8px; align-items: center; }
+.d-missing { color: #b00; font-style: italic; }
+.d-tbl { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
+.d-tbl td { border: 1px solid #aaa; padding: 1px 3px; height: 21px; vertical-align: middle; }
+.d-tbl td.c { text-align: center; }
+.d-tbl .b td, .d-tbl td.b { font-weight: 700; }
+.d-tbl .sub td, .d-tbl td.sub { background: #f2f2f2; }
+.d-tbl .w-num { width: 30px; }
+.d-tbl .tn td { border: none; border-bottom: 1px solid #aaa; font-size: 18.7px; font-weight: 700; padding-top: 6px; }
+.d-tbl .rh td { border: none; border-bottom: 1px solid #aaa; font-weight: 700; }
+.d-tbl .tm { color: #c00000; font-weight: 700; }
+.d-tbl tr.struck td { text-decoration: line-through; color: #888; }
+.d-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 20px; align-items: start; }
+.d-roster td:nth-child(1) { width: 24px; } .d-roster td:nth-child(3), .d-roster td:nth-child(4) { width: 42px; }
+.d-roster td:nth-child(5) { width: 18px; } .d-roster td:nth-child(6) { width: 43px; }
+.d-round td:nth-child(1) { width: 25px; } .d-round td:nth-child(2), .d-round td:nth-child(6) { width: 31px; } .d-round td:nth-child(4) { width: 19px; }
+.d-round td.ref { width: 147px; padding: 0; }
+.d-ref { width: 100%; height: 21px; border: none; background: #fffbe0; font: inherit; padding: 0 3px; }
+.d-ref.changed { background: #ffe9b0; }
+.d-ref:focus { outline: 2px solid #4a7bd0; }
+.d-cal-pair { width: 680px; margin: 0 auto 16px; gap: 27px; }
+.d-cal td { height: 42px; }
+.d-cal .sub td { height: 21px; }
+.d-cal td.hit { background: #c8d9f0; font-weight: 700; }
+.d-cal td.we { color: #808080; }
+.pgbr { border-top: 2px dashed #bbb; margin: 28px 0 14px; text-align: center; }
+.pgbr span { position: relative; top: -10px; background: #fff; padding: 0 8px; font: 11px var(--sans); color: #888; }
+.d-rich { border: 1px dashed #c9c2a8; border-radius: 3px; margin: 4px 0 10px; }
+.d-rich-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 6px; background: #faf7ec; font: 11.5px var(--sans); color: var(--muted); }
+.rich-editor .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid #e3ddc8; padding: 3px 4px; font-family: var(--sans); }
+.rich-editor .ql-container.ql-snow { border: none; font: inherit; }
+.rich-editor .ql-editor { padding: 6px 8px; min-height: 30px; line-height: 1.22; }
+.rich-editor .ql-editor p { margin: 0 0 6px; }
+@media (max-width: 720px) {
+  .source-list .confirm, .source-list .muted { margin-left: 0; }
+}
