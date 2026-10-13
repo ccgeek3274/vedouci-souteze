@@ -1,6 +1,6 @@
 import { flagParts } from '../../../shared/roster/draft';
 
-/** Roster designation as three columns in a fixed order: Z | K/ZK | H/V/C (under one "Označení" header, colSpan 3). */
+/** Roster designation as three columns in a fixed order: Z | K/ZK | H/V/C (own "Z" header, then "Označení" over the other two). */
 export function FlagCells({ flags, z }: { flags: string; z: boolean }) {
   const { cap, letter } = flagParts(flags);
   return (

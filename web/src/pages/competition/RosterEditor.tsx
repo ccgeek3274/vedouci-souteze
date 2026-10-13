@@ -66,7 +66,7 @@ export function RosterEditor({ competitionId, team, players, boards, onDone }: {
         {mismatches > 0 && <> <span className="tag warn">{mismatches}× Z neodpovídá pravidlu</span></>}
       </p>
       <table className="table">
-        <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th colSpan={3}>Označení</th><th /></tr></thead>
+        <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th className="flag">Z</th><th colSpan={2}>Označení</th><th /></tr></thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={r.key}>

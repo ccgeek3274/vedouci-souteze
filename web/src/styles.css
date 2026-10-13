@@ -75,7 +75,7 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
 .table-scroll { overflow-x: auto; }
 
 .chip { display: inline-flex; align-items: center; height: 23px; padding: 0 7px; border-radius: var(--radius); font: 600 11px var(--mono); letter-spacing: 0.03em; background: var(--chip-idle-bg); color: var(--chip-idle-fg); border: 1px solid var(--chip-idle-bd); }
-.table td.flag { width: 1%; padding-left: 4px; padding-right: 4px; white-space: nowrap; }
+.table td.flag, .table th.flag { width: 46px; min-width: 46px; padding-left: 4px; padding-right: 4px; white-space: nowrap; }
 .chip.active { background: var(--ink); color: oklch(0.96 0.012 85); border-color: var(--ink); font-weight: 700; }
 
 .alert { padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--danger); background: var(--danger-bg); color: var(--danger); margin-bottom: 16px; }

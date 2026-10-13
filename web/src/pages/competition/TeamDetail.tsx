@@ -123,7 +123,7 @@ export function TeamDetail() {
               {checkError && <div className="alert">{checkError}</div>}
               {data.roster.filename && <p className="helper-text" style={{ marginTop: 0 }}>Zdroj: {data.roster.filename}</p>}
               <table className="table">
-                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th colSpan={3}>Označení</th><th title="Ruční potvrzení dokladu (např. papírové povolení předložené na losovací schůzi). Potvrzená hostování a registrace cizinců z registrů ŠSČR se kontrolují automaticky.">Doloženo ručně</th>{issues && <><th>Kontrola chess.cz</th><th /></>}</tr></thead>
+                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th className="flag">Z</th><th colSpan={2}>Označení</th><th title="Ruční potvrzení dokladu (např. papírové povolení předložené na losovací schůzi). Potvrzená hostování a registrace cizinců z registrů ŠSČR se kontrolují automaticky.">Doloženo ručně</th>{issues && <><th>Kontrola chess.cz</th><th /></>}</tr></thead>
                 <tbody>
                   {data.roster.players.map((p) => (
                     <tr key={p.id} className={p.struck ? 'struck' : undefined}>

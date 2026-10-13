@@ -193,7 +193,7 @@ function PlayersTable({ draft }: { draft: RosterDraft }) {
   return (
     <div className="table-scroll">
       <table className="table">
-        <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th colSpan={3}>Označení</th></tr></thead>
+        <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th className="flag">Z</th><th colSpan={2}>Označení</th></tr></thead>
         <tbody>
           {draft.players.map((pl, i) => (
             <tr key={i}>
