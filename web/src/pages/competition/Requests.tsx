@@ -36,7 +36,7 @@ export function Requests() {
           {byKind.map(([kind, list]) => (
             <div key={kind}>
               <div className="section-title">{REQUEST_KIND_LABEL[kind]}</div>
-              <RequestTable requests={list} />
+              <RequestTable requests={list} showKind={false} />
             </div>
           ))}
         </div>

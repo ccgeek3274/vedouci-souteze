@@ -19,7 +19,8 @@ skupiny družstev stejného oddílu (podle `club_code`, jinak názvu oddílu).
 
 ## Požadavky na losování (`requests.kind = 'draw_no'`, migrace 0009)
 Jedna entita s požadavky (žádná zvláštní tabulka podmínek — původní `draw_constraints` z 0008 převedeny a zrušeny).
-Upravují se na záložce Požadavky, v detailu družstva i na záložce Losování (společné `RequestItems.tsx`).
+Upravují se na záložce Požadavky, v detailu družstva i na záložce Losování (společné `RequestItems.tsx`):
+výchozí je zobrazení, tlačítko „Upravit“ otevře formulář se stejnými poli jako nový požadavek (uloží se najednou).
 Strukturovaná část (`draw_kind` + pole) je celá **nepovinná**; neúplný požadavek = „nevyřešeno — chybí …“
 a do kontrol ani řízeného losování se nezapočítá. Zamítnutý se nekontroluje.
 - `draw_no` — požadované číslo (`value`),

@@ -4,12 +4,12 @@ import { api, apiErrorText } from '../../lib/api';
 import { czDate, REQUEST_KIND_LABEL, REQUEST_STATUS_LABEL } from '../../lib/format';
 import type { TeamWithSummary } from '../../lib/types';
 import {
-  conditionStates, defaultDeadline, describeDraw, drawConstraints, emptyNumbers, fixtures, numberProblems, sameClubGroups, suggestNumbers,
+  conditionStates, defaultDeadline, drawConstraints, emptyNumbers, fixtures, numberProblems, sameClubGroups, suggestNumbers,
   table, tableSize, violations, type DrawInput,
 } from '../../../../shared/draw/check';
 import { matchStart, shortTime } from '../../../../shared/startTime';
 import { useCompetition } from './CompetitionLayout';
-import { RequestTable, STATE_CLASS } from './RequestItems';
+import { requestSummary, RequestTable } from './RequestItems';
 
 // Draw meeting (M7). Workflow: numbers start empty; requests (start times, draw conditions) are decided and
 // completed during the meeting, numbers are filled in one by one as teams are drawn (each saved at once).
@@ -66,7 +66,7 @@ export function Draw() {
         <div className="card-strip"><h2>Začátky utkání</h2>
           <span className="helper">Schvaluje se na losovací schůzi; schválený požadavek = výjimka v rozlosování (kromě posledního kola).</span></div>
         <div className="card-body table-scroll">
-          {startReqs.length ? <RequestTable requests={startReqs} /> : <p className="muted" style={{ margin: 0 }}>Žádné požadavky na začátek utkání.</p>}
+          {startReqs.length ? <RequestTable requests={startReqs} showKind={false} /> : <p className="muted" style={{ margin: 0 }}>Žádné požadavky na začátek utkání.</p>}
         </div>
       </div>
 
@@ -74,7 +74,7 @@ export function Draw() {
         <div className="card-strip"><h2>Požadavky na losování</h2>
           <span className="helper">Upřesněte během schůze; neúplné = nevyřešeno{unresolved ? ` (${unresolved})` : ''}. Zamítnuté se nekontrolují.</span></div>
         <div className="card-body table-scroll">
-          {drawReqs.length ? <RequestTable requests={drawReqs} states={states} /> : <p className="muted" style={{ marginTop: 0 }}>Žádné požadavky na losování (přidávají se na záložce Požadavky nebo u družstva).</p>}
+          {drawReqs.length ? <RequestTable requests={drawReqs} states={states} showKind={false} /> : <p className="muted" style={{ marginTop: 0 }}>Žádné požadavky na losování (přidávají se na záložce Požadavky nebo u družstva).</p>}
           <div className="section-title">Pravidlo: družstva stejného oddílu se utkají do {czDate(deadline)}</div>
           {pairs.length ? (
             <ul className="list-plain">
@@ -168,14 +168,6 @@ function Documents({ teams, deadline }: { teams: TeamWithSummary[]; deadline: st
   const name = (id: string | null) => data.teams.find((t) => t.id === id)?.name ?? '?';
   const reqs = (id: string) => data.requests.filter((r) => r.team_id === id);
   const general = data.requests.filter((r) => !r.team_id);
-  const label = (r: (typeof data.requests)[number]) => {
-    if (r.kind === 'start_time') return `${r.side === 'away' ? 'venku' : 'doma'} ${shortTime(r.time) || '?'}`;
-    if (r.kind === 'draw_no') {
-      const [x] = drawConstraints([{ ...r, status: 'new' }]);
-      return x?.kind ? describeDraw(x, name) : 'neurčeno';
-    }
-    return r.text;
-  };
   return (
     <div className="card">
       <div className="card-strip"><h2>Podklady pro losovací schůzi</h2>
@@ -190,9 +182,9 @@ function Documents({ teams, deadline }: { teams: TeamWithSummary[]; deadline: st
                 <td><Link to={`../t/${t.id}`} style={{ fontWeight: 600 }}>{t.name}</Link></td>
                 <td style={{ fontSize: 13.5 }}>
                   {reqs(t.id).map((r) => (
-                    <div key={r.id}>
-                      <span className="muted">{REQUEST_KIND_LABEL[r.kind]}:</span> {label(r)}{' '}
-                      {r.kind !== 'start_time' && r.kind !== 'draw_no' ? null : r.text && <span className="muted">(„{r.text}“)</span>}{' '}
+                    <div key={r.id} style={{ marginBottom: 3 }}>
+                      <span className="req-kind">{REQUEST_KIND_LABEL[r.kind]}</span>{requestSummary(r, name)}{' '}
+                      {r.text && r.text !== requestSummary(r, name) && <span className="muted">(„{r.text}“)</span>}{' '}
                       <span className={`tag${r.status === 'accepted' ? ' ok' : r.status === 'rejected' ? ' bad' : ''}`}>{REQUEST_STATUS_LABEL[r.status]}</span>
                       {r.decision && <span className="muted"> → {r.decision}</span>}
                     </div>

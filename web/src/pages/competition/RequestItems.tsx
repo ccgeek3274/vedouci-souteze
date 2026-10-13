@@ -1,154 +1,241 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
 import { REQUEST_KIND_LABEL, REQUEST_STATUS_LABEL } from '../../lib/format';
 import type { Request } from '../../lib/types';
 import { normTime, shortTime } from '../../../../shared/startTime';
-import { CONSTRAINT_LABEL, tableSize, type ConditionState, type ConstraintKind } from '../../../../shared/draw/check';
+import { CONSTRAINT_LABEL, describeDraw, drawConstraints, tableSize, type ConditionState, type ConstraintKind } from '../../../../shared/draw/check';
 import { useCompetition } from './CompetitionLayout';
 
-// Request editing shared by the Požadavky tab, the team page and the Losování tab.
-// Draw requests (kind draw_no) carry a structured condition; every part is optional and can be completed
-// during the draw meeting — an incomplete one is shown as "nevyřešeno".
+// Requests shared by the Požadavky tab, the team page and the Losování tab: read-only rows with an "Upravit"
+// button opening one form (the same fields as a new request). Draw requests (kind draw_no) carry a structured
+// condition; every part is optional and can be completed at the meeting — incomplete = "nevyřešeno".
 
-const SIDE_LABEL = { home: 'domácí utkání', away: 'utkání venku' } as const;
 export const STATE_CLASS: Record<ConditionState['state'], string> = { ok: 'ok', violated: 'bad', unresolved: 'warn', waiting: '' };
+const STATUS_CLASS: Record<string, string> = { new: '', accepted: 'ok', rejected: 'bad' };
 
-type DrawSpecValue = Pick<Request, 'draw_kind' | 'round' | 'value' | 'other_team_id' | 'ext_name' | 'ext_no' | 'ext_teams'>;
-const EMPTY_SPEC: DrawSpecValue = { draw_kind: null, round: null, value: null, other_team_id: null, ext_name: '', ext_no: null, ext_teams: null };
+/** Editable fields of a request (form state: numbers as strings). */
+type Draft = {
+  team_id: string; kind: string; status: string; text: string; decision: string; time: string; side: string;
+  draw_kind: string; value: string; round: string; other_team_id: string; ext_name: string; ext_no: string; ext_teams: string;
+};
+const str = (v: number | null | undefined) => (v == null ? '' : String(v));
+const num = (v: string) => (v ? Number(v) : null);
 
-/** Number input committing on blur (null when empty). */
-function NumInput({ value, onCommit, width = 56, placeholder }: { value: number | null; onCommit: (v: number | null) => void; width?: number; placeholder?: string }) {
-  const [v, setV] = useState(value == null ? '' : String(value));
-  useEffect(() => setV(value == null ? '' : String(value)), [value]);
-  return (
-    <input className="input input-sm mono" style={{ width }} value={v} placeholder={placeholder}
-      onChange={(e) => setV(e.target.value.replace(/\D/g, ''))}
-      onBlur={() => (v ? Number(v) : null) !== value && onCommit(v ? Number(v) : null)} />
-  );
+function toDraft(r: Request): Draft {
+  return {
+    team_id: r.team_id ?? '', kind: r.kind, status: r.status, text: r.text, decision: r.decision, time: r.time ?? '', side: r.side ?? 'home',
+    draw_kind: r.draw_kind ?? '', value: str(r.value), round: str(r.round), other_team_id: r.other_team_id ?? '',
+    ext_name: r.ext_name ?? '', ext_no: str(r.ext_no), ext_teams: str(r.ext_teams),
+  };
+}
+const EMPTY: Draft = {
+  team_id: '', kind: 'draw_no', status: 'new', text: '', decision: '', time: '10:00', side: 'home',
+  draw_kind: '', value: '', round: '', other_team_id: '', ext_name: '', ext_no: '', ext_teams: '',
+};
+
+/** API body from the form. */
+function toBody(d: Draft) {
+  return {
+    team_id: d.team_id || undefined, kind: d.kind, status: d.status, text: d.text.trim(), decision: d.decision.trim(),
+    ...(d.kind === 'start_time' ? { time: d.time || null, side: d.side } : {}),
+    ...(d.kind === 'draw_no' ? {
+      draw_kind: d.draw_kind || null, value: num(d.value), round: num(d.round), other_team_id: d.other_team_id || null,
+      ext_name: d.ext_name.trim(), ext_no: num(d.ext_no), ext_teams: num(d.ext_teams),
+    } : {}),
+  };
 }
 
-/** Editor of the structured draw condition. */
-export function DrawSpec({ value, teamId, onChange }: { value: DrawSpecValue; teamId: string | null; onChange: (patch: Partial<DrawSpecValue>) => void }) {
+/** One-line description of a request. */
+export function requestSummary(r: Request, name: (id: string | null) => string): string {
+  if (r.kind === 'start_time') return r.time ? `${r.side === 'away' ? 'Utkání venku' : 'Domácí utkání'} v ${shortTime(r.time)}` : 'Začátek utkání — chybí čas';
+  if (r.kind === 'draw_no') {
+    const [c] = drawConstraints([{ ...r, status: 'new', team_id: r.team_id ?? '' }]);
+    const s = c?.kind ? describeDraw(c, name) : 'druh neurčen';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  return r.text;
+}
+
+function RequestFields({ d, set, withTeam, withStatus }: { d: Draft; set: (p: Partial<Draft>) => void; withTeam: boolean; withStatus: boolean }) {
   const { data } = useCompetition();
   const active = data.teams.filter((t) => t.status === 'active');
   const size = tableSize(active.length);
-  const k = value.draw_kind as ConstraintKind | null;
+  const k = d.draw_kind as ConstraintKind | '';
   const pattern = k === 'alternate' || k === 'same';
-  const [extName, setExtName] = useState(value.ext_name);
-  useEffect(() => setExtName(value.ext_name), [value.ext_name]);
+  const digits = (key: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement>) => set({ [key]: e.target.value.replace(/\D/g, '') });
+  const needsTeam = d.kind === 'start_time' || d.kind === 'draw_no';
   return (
-    <div className="row" style={{ gap: 6 }}>
-      <select className="input input-sm" value={k ?? ''} onChange={(e) => onChange({ draw_kind: e.target.value || null })}>
-        <option value="">— druh neurčen —</option>
-        {Object.entries(CONSTRAINT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
-      {k === 'draw_no' && <>číslo <NumInput value={value.value} placeholder={`1–${size}`} onCommit={(v) => onChange({ value: v })} /></>}
-      {(k === 'home' || k === 'away' || k === 'meet') && <>kolo <NumInput value={value.round} onCommit={(v) => onChange({ round: v })} /></>}
-      {(k === 'meet' || pattern) && (
-        <select className="input input-sm" value={value.other_team_id ?? ''} onChange={(e) => onChange({ other_team_id: e.target.value || null })}>
-          <option value="">{pattern ? '— družstvo jiné soutěže —' : '— soupeř —'}</option>
-          {active.filter((t) => t.id !== teamId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+    <div className="form-grid">
+      {withTeam && (
+        <div className="field span-2"><label>Družstvo</label>
+          <select className="input input-sm" value={d.team_id} onChange={(e) => set({ team_id: e.target.value })}>
+            <option value="">{needsTeam ? '— vyberte družstvo —' : '— celá soutěž —'}</option>
+            {active.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select></div>
       )}
-      {pattern && !value.other_team_id && (
+      <div className="field"><label>Typ</label>
+        <select className="input input-sm" value={d.kind} onChange={(e) => set({ kind: e.target.value })}>
+          {Object.entries(REQUEST_KIND_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select></div>
+      {withStatus && (
+        <div className="field"><label>Stav</label>
+          <select className="input input-sm" value={d.status} onChange={(e) => set({ status: e.target.value })}>
+            {Object.entries(REQUEST_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select></div>
+      )}
+
+      {d.kind === 'start_time' && (
         <>
-          <input className="input input-sm" style={{ width: 170 }} placeholder="např. Kralupy A (KP)" value={extName}
-            onChange={(e) => setExtName(e.target.value)} onBlur={() => extName !== value.ext_name && onChange({ ext_name: extName })} />
-          jeho č. <NumInput value={value.ext_no} placeholder="?" onCommit={(v) => onChange({ ext_no: v })} />
-          z <NumInput value={value.ext_teams} placeholder="?" onCommit={(v) => onChange({ ext_teams: v })} /> družstev
+          <div className="field"><label>Utkání</label>
+            <select className="input input-sm" value={d.side} onChange={(e) => set({ side: e.target.value })}>
+              <option value="home">domácí</option>
+              <option value="away">venku</option>
+            </select></div>
+          <div className="field"><label>Začátek</label>
+            <input type="time" className="input input-sm mono" value={d.time} onChange={(e) => set({ time: e.target.value })} /></div>
         </>
+      )}
+
+      {d.kind === 'draw_no' && (
+        <>
+          <div className="field span-2"><label>Podmínka losování</label>
+            <select className="input input-sm" value={k} onChange={(e) => set({ draw_kind: e.target.value })}>
+              <option value="">— zatím neurčeno —</option>
+              {Object.entries(CONSTRAINT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select></div>
+          {k === 'draw_no' && (
+            <div className="field"><label>Číslo (1–{size})</label>
+              <input className="input input-sm mono" value={d.value} onChange={digits('value')} /></div>
+          )}
+          {(k === 'home' || k === 'away' || k === 'meet') && (
+            <div className="field"><label>Kolo (1–{size - 1})</label>
+              <input className="input input-sm mono" value={d.round} onChange={digits('round')} /></div>
+          )}
+          {(k === 'meet' || pattern) && (
+            <div className="field span-2"><label>{k === 'meet' ? 'Soupeř' : 'Druhé družstvo'}</label>
+              <select className="input input-sm" value={d.other_team_id} onChange={(e) => set({ other_team_id: e.target.value })}>
+                <option value="">{pattern ? '— družstvo jiné soutěže —' : '— zatím neurčen —'}</option>
+                {active.filter((t) => t.id !== d.team_id).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select></div>
+          )}
+          {pattern && !d.other_team_id && (
+            <>
+              <div className="field span-2"><label>Družstvo jiné soutěže</label>
+                <input className="input input-sm" placeholder="např. Kralupy A (KP)" value={d.ext_name} onChange={(e) => set({ ext_name: e.target.value })} /></div>
+              <div className="field"><label>Jeho los. číslo</label>
+                <input className="input input-sm mono" placeholder="upřesní se" value={d.ext_no} onChange={digits('ext_no')} /></div>
+              <div className="field"><label>Družstev v soutěži</label>
+                <input className="input input-sm mono" value={d.ext_teams} onChange={digits('ext_teams')} /></div>
+            </>
+          )}
+        </>
+      )}
+
+      <div className="field full"><label>{d.kind === 'start_time' || d.kind === 'draw_no' ? 'Původní text / poznámka' : 'Text požadavku'}</label>
+        <input className="input input-sm" value={d.text} onChange={(e) => set({ text: e.target.value })}
+          placeholder={d.kind === 'draw_no' ? 'např. protičíslo ke Kralupy A (KP)' : d.kind === 'start_time' ? 'nepovinné' : 'např. přeložení 3. kola'} /></div>
+      {withStatus && (
+        <div className="field full"><label>Rozhodnutí / poznámka vedoucího</label>
+          <input className="input input-sm" value={d.decision} onChange={(e) => set({ decision: e.target.value })} /></div>
       )}
     </div>
   );
 }
 
-/** Requests as an editable table. `states` = evaluation of draw conditions (Losování tab). */
-export function RequestTable({ requests, showTeam = true, states }: { requests: Request[]; showTeam?: boolean; states?: Map<number, ConditionState> }) {
-  const { data, refresh } = useCompetition();
+function RequestEdit({ r, onClose }: { r: Request; onClose: () => void }) {
+  const { refresh } = useCompetition();
+  const [d, setD] = useState(() => toDraft(r));
   const [error, setError] = useState<string | null>(null);
-  const teamName = new Map(data.teams.map((t) => [t.id, t.name]));
-  const run = async (fn: () => Promise<unknown>) => {
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
     setError(null);
-    try { await fn(); await refresh(); } catch (e) { setError(apiErrorText(e)); }
+    setBusy(true);
+    try {
+      const { team_id: _team, ...body } = toBody(d);
+      await api.patch(`/requests/${r.id}`, body);
+      await refresh();
+      onClose();
+    } catch (e) {
+      setError(apiErrorText(e));
+    } finally {
+      setBusy(false);
+    }
   };
-  const patch = (r: Request, body: Partial<Request>) => run(() => api.patch(`/requests/${r.id}`, body));
+  return (
+    <div className="req-edit">
+      {error && <div className="alert">{error}</div>}
+      <RequestFields d={d} set={(p) => setD({ ...d, ...p })} withTeam={false} withStatus />
+      <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end' }}>
+        <button className="btn btn-small" onClick={onClose} disabled={busy}>Zrušit</button>
+        <button className="btn btn-small btn-primary" onClick={save} disabled={busy || (d.kind === 'start_time' && !normTime(d.time))}>Uložit</button>
+      </div>
+    </div>
+  );
+}
+
+/** Requests as read-only rows; "Upravit" opens the form. `states` = evaluation of draw conditions (Losování tab). */
+export function RequestTable({ requests, showTeam = true, showKind = true, states }: {
+  requests: Request[]; showTeam?: boolean; showKind?: boolean; states?: Map<number, ConditionState>;
+}) {
+  const { data, refresh } = useCompetition();
+  const [editing, setEditing] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const name = (id: string | null) => data.teams.find((t) => t.id === id)?.name ?? '?';
+  const remove = async (r: Request) => {
+    if (!window.confirm('Smazat požadavek?')) return;
+    setError(null);
+    try { await api.delete(`/requests/${r.id}`); await refresh(); } catch (e) { setError(apiErrorText(e)); }
+  };
 
   return (
-    <>
+    <div className="req-list">
       {error && <div className="alert">{error}</div>}
-      <table className="table" style={{ tableLayout: 'fixed', minWidth: 980 }}>
-        <tbody>
-          {requests.map((r) => {
-            const st = states?.get(r.id);
-            return (
-              <tr key={r.id} style={{ verticalAlign: 'top' }}>
-                {showTeam && <td style={{ width: 210 }}>{r.team_id ? <Link to={`../t/${r.team_id}`}>{teamName.get(r.team_id)}</Link> : <span className="muted">soutěž</span>}</td>}
-                <td>
-                  {r.kind === 'start_time' && (
-                    <div className="row" style={{ gap: 6 }}>
-                      <select className="input input-sm" value={r.side ?? 'home'} onChange={(e) => patch(r, { side: e.target.value as Request['side'] })}>
-                        <option value="home">doma</option>
-                        <option value="away">venku</option>
-                      </select>
-                      <input type="time" className="input input-sm mono" style={{ width: 110 }} defaultValue={r.time ?? ''} key={r.time ?? ''}
-                        onBlur={(e) => normTime(e.target.value) !== (r.time ?? '') && patch(r, { time: e.target.value || null })} />
-                      {!r.time && <span className="tag warn">doplňte čas</span>}
-                    </div>
-                  )}
-                  {r.kind === 'draw_no' && <DrawSpec value={r} teamId={r.team_id} onChange={(p) => patch(r, p)} />}
-                  {(r.text || r.source === 'roster') && (
-                    <div className={r.kind === 'start_time' || r.kind === 'draw_no' ? 'muted' : undefined} style={{ fontSize: 12.5, marginTop: 4 }}>
-                      {(r.kind === 'start_time' || r.kind === 'draw_no') && 'Původní text: '}„{r.text}“
-                      {r.source === 'roster' && <span className="tag" style={{ marginLeft: 8 }}>ze soupisky</span>}
-                    </div>
-                  )}
-                  {st && <div style={{ marginTop: 4 }}><span className={`tag ${STATE_CLASS[st.state]}`}>{st.text}</span></div>}
-                </td>
-                <td style={{ width: 130 }}>
-                  <select className="input input-sm" value={r.kind} onChange={(e) => patch(r, { kind: e.target.value })}>
-                    {Object.entries(REQUEST_KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                </td>
-                <td style={{ width: 120 }}>
-                  <select className="input input-sm" value={r.status} onChange={(e) => patch(r, { status: e.target.value as Request['status'] })}>
-                    {Object.entries(REQUEST_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                </td>
-                <td style={{ width: 180 }}>
-                  <input className="input input-sm" style={{ width: '100%' }} placeholder="Rozhodnutí / poznámka" defaultValue={r.decision} key={r.decision}
-                    onBlur={(e) => e.target.value !== r.decision && patch(r, { decision: e.target.value })} />
-                </td>
-                <td className="actions" style={{ width: 36 }}>
-                  <button className="icon-btn" title="Smazat" onClick={() => window.confirm('Smazat požadavek?') && run(() => api.delete(`/requests/${r.id}`))}>✕</button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </>
+      {requests.map((r) => {
+        const st = states?.get(r.id);
+        const summary = requestSummary(r, name);
+        return (
+          <div key={r.id} className={`req-row${showTeam ? ' with-team' : ''}`}>
+            {showTeam && (
+              <div className="req-team">{r.team_id ? <Link to={`../t/${r.team_id}`}>{name(r.team_id)}</Link> : <span className="muted">celá soutěž</span>}</div>
+            )}
+            <div className="req-main">
+              <div>{showKind && <span className="req-kind">{REQUEST_KIND_LABEL[r.kind]}</span>}{summary}</div>
+              {r.text && r.text !== summary && (
+                <div className="req-sub">„{r.text}“{r.source === 'roster' && <span className="muted"> · ze soupisky</span>}</div>
+              )}
+              {r.decision && <div className="req-sub">Rozhodnutí: {r.decision}</div>}
+            </div>
+            <div className="req-tags">
+              <span className={`tag ${STATUS_CLASS[r.status] ?? ''}`}>{REQUEST_STATUS_LABEL[r.status]}</span>
+              {st && <span className={`tag ${STATE_CLASS[st.state]}`} title={st.text}>{st.text}</span>}
+            </div>
+            <div className="req-actions no-print">
+              {editing !== r.id && <button className="btn btn-small" onClick={() => setEditing(r.id)}>Upravit</button>}
+              <button className="icon-btn" title="Smazat" onClick={() => remove(r)}>✕</button>
+            </div>
+            {editing === r.id && <RequestEdit r={r} onClose={() => setEditing(null)} />}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
 /** Form for a new request; `teamId` fixes the team (team page). */
 export function NewRequestForm({ teamId }: { teamId?: string }) {
   const { data, refresh } = useCompetition();
-  const active = data.teams.filter((t) => t.status === 'active');
+  const [d, setD] = useState<Draft>({ ...EMPTY, team_id: teamId ?? '' });
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ team_id: teamId ?? '', kind: 'draw_no', text: '', time: '10:00', side: 'home' });
-  const [spec, setSpec] = useState<DrawSpecValue>(EMPTY_SPEC);
-  const team = teamId ?? form.team_id;
-  const needsTeam = form.kind === 'start_time' || form.kind === 'draw_no';
-  const ready = (!needsTeam || team) && (form.kind === 'start_time' ? !!normTime(form.time) : form.kind === 'draw_no' ? !!(spec.draw_kind || form.text.trim()) : !!form.text.trim());
+  const needsTeam = d.kind === 'start_time' || d.kind === 'draw_no';
+  const ready = (!needsTeam || d.team_id) && (d.kind === 'start_time' ? !!normTime(d.time) : d.kind === 'draw_no' ? !!(d.draw_kind || d.text.trim()) : !!d.text.trim());
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
-      await api.post(`/competitions/${data.competition.id}/requests`, { ...form, team_id: team || undefined, ...(form.kind === 'draw_no' ? spec : {}) });
-      setForm({ ...form, text: '' });
-      setSpec(EMPTY_SPEC);
+      await api.post(`/competitions/${data.competition.id}/requests`, toBody(d));
+      setD({ ...EMPTY, kind: d.kind, team_id: teamId ?? '' });
       await refresh();
     } catch (err) {
       setError(apiErrorText(err));
@@ -158,45 +245,10 @@ export function NewRequestForm({ teamId }: { teamId?: string }) {
   return (
     <form onSubmit={submit}>
       {error && <div className="alert">{error}</div>}
-      <div className="grid-4">
-        {!teamId && (
-          <div className="field"><label>Družstvo</label>
-            <select className="input" value={form.team_id} onChange={(e) => setForm({ ...form, team_id: e.target.value })}>
-              <option value="">{needsTeam ? '— vyberte družstvo —' : '— celá soutěž —'}</option>
-              {active.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select></div>
-        )}
-        <div className="field"><label>Typ</label>
-          <select className="input" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-            {Object.entries(REQUEST_KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select></div>
-        {form.kind === 'start_time' && (
-          <>
-            <div className="field"><label>Utkání</label>
-              <select className="input" value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value })}>
-                <option value="home">{SIDE_LABEL.home}</option>
-                <option value="away">{SIDE_LABEL.away}</option>
-              </select></div>
-            <div className="field"><label>Začátek</label>
-              <input type="time" className="input mono" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></div>
-          </>
-        )}
-        {form.kind !== 'start_time' && form.kind !== 'draw_no' && (
-          <div className="field" style={{ gridColumn: 'span 2' }}><label>Text</label>
-            <input className="input" value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} placeholder="např. přeložení 3. kola" /></div>
-        )}
-      </div>
-      {form.kind === 'draw_no' && (
-        <div className="field" style={{ marginTop: 14 }}><label>Podmínka losování (lze doplnit později)</label>
-          <DrawSpec value={spec} teamId={team || null} onChange={(p) => setSpec({ ...spec, ...p })} /></div>
-      )}
-      {(form.kind === 'start_time' || form.kind === 'draw_no') && (
-        <div className="field" style={{ marginTop: 14 }}><label>Původní text / poznámka (nepovinné)</label>
-          <input className="input" value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })}
-            placeholder={form.kind === 'start_time' ? `${SIDE_LABEL[form.side as 'home' | 'away']} v ${shortTime(form.time) || '…'}` : 'např. protičíslo ke Kralupy A (KP)'} /></div>
-      )}
-      <div className="row" style={{ marginTop: 16 }}>
-        <button className="btn btn-primary" disabled={!ready}>Přidat požadavek</button>
+      <RequestFields d={d} set={(p) => setD({ ...d, ...p })} withTeam={!teamId} withStatus={false} />
+      <div className="row" style={{ marginTop: 14 }}>
+        <button className="btn btn-primary btn-small" disabled={!ready}>Přidat požadavek</button>
+        {d.kind === 'draw_no' && <span className="helper-text">Podmínku lze upřesnit později, i během losovací schůze.</span>}
       </div>
     </form>
   );
