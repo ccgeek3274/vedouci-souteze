@@ -110,17 +110,17 @@ function buildDocument(D: Docx, model: BulletinModel) {
     return table(c, rows);
   };
 
-  // ── Rosters in pairs: one flat table (6 cols | gap | 6 cols), see uvodni-zpravodaj ──
+  // ── Rosters in pairs: one flat table (7 cols | gap | 7 cols), see uvodni-zpravodaj ──
   type RT = { stc: number | null; name: string; players: RosterRow[] };
   const filled = (t: RT | undefined, ri: number) => !!t && ri < t.players.length + 2;
   const rosterHalf = (t: RT | undefined, ri: number, kn: boolean) => {
     const cw = ROSTER_COLS;
     if (!filled(t, ri)) {
       const under = !!t && ri === t.players.length + 2;
-      return [cell('', { w: sum(cw), span: 6, keepNext: kn, borders: { top: under ? B_S : B_N, bottom: B_N, left: B_N, right: B_N } })];
+      return [cell('', { w: sum(cw), span: 7, keepNext: kn, borders: { top: under ? B_S : B_N, bottom: B_N, left: B_N, right: B_N } })];
     }
-    if (ri === 0) return [cell(`${t!.stc ?? ''}  ${t!.name}`, { w: sum(cw), span: 6, bold: true, size: FS_NAME, keepNext: kn, valign: 'bottom', borders: { top: B_N, left: B_N, right: B_N, bottom: B_S } })];
-    if (ri === 1) return ROSTER_HDRS.map((x, i) => cell(x, { w: cw[i], bold: true, bg: C_SUB, align: i === 1 || i === 5 ? 'left' : 'center', keepNext: kn }));
+    if (ri === 0) return [cell(`${t!.stc ?? ''}  ${t!.name}`, { w: sum(cw), span: 7, bold: true, size: FS_NAME, keepNext: kn, valign: 'bottom', borders: { top: B_N, left: B_N, right: B_N, bottom: B_S } })];
+    if (ri === 1) return ROSTER_HDRS.map((x, i) => cell(x, { w: cw[i], bold: true, bg: C_SUB, align: i === 1 ? 'left' : 'center', keepNext: kn }));
     const p = t!.players[ri - 2];
     return [
       cell(p.pos, { w: cw[0], align: 'center', keepNext: kn }),
@@ -128,7 +128,8 @@ function buildDocument(D: Docx, model: BulletinModel) {
       cell(p.nrtg || '', { w: cw[2], align: 'center', keepNext: kn }),
       cell(p.irtg || '', { w: cw[3], align: 'center', keepNext: kn }),
       cell(p.z ? 'Z' : '', { w: cw[4], align: 'center', keepNext: kn }),
-      cell(p.typ, { w: cw[5], keepNext: kn }),
+      cell(p.letter, { w: cw[5], align: 'center', keepNext: kn }),
+      cell(p.cap, { w: cw[6], align: 'center', keepNext: kn }),
     ];
   };
   const rosterPair = (pair: RT[]) => {

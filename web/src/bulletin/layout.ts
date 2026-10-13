@@ -18,7 +18,7 @@ export { sum };
 export const CELL_PAD = 50;
 export const ROSTER_GAP = 200;
 export const ROSTER_W = Math.floor((CONTENT - ROSTER_GAP) / 2);
-const ROSTER_FIX = [360, 0, 640, 620, 270, 650];
+const ROSTER_FIX = [360, 0, 640, 620, 300, 300, 380];
 export const ROSTER_COLS = ROSTER_FIX.map((w) => w || ROSTER_W - sum(ROSTER_FIX));
 const PAGE_BODY_H = PAGE_H - 2 * MARGIN_Y;
 const ROSTER_FULL = 20;
@@ -26,7 +26,7 @@ export const ROSTER_TITLE_H = 420;
 export const ROSTER_PAIR_GAP = 440;
 export const GAP_PARA_H = 20;
 export const ROSTER_ROW_H = Math.floor((PAGE_BODY_H - 100 - 2 * ROSTER_TITLE_H - ROSTER_PAIR_GAP - 2 * GAP_PARA_H) / (2 * (1 + ROSTER_FULL))) - 20;
-export const ROSTER_HDRS = ['', 'Jméno', 'NRtg', 'IRtg', 'Z', 'Typ'];
+export const ROSTER_HDRS = ['', 'Jméno', 'NRtg', 'IRtg', 'Z', 'P', 'K'];
 
 export const SCHED_HDRS = ['Č.', 'St.', 'Družstvo', '-', 'Družstvo', 'St.', 'Rozhodčí'];
 const COL_NR = 380, COL_STC = 460, COL_RES = 280, COL_REF = 2200;

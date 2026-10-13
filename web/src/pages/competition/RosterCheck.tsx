@@ -8,6 +8,7 @@ import type { RosterCheckData, RosterPlayer } from '../../lib/types';
 import { asArray, deficiencyReport, strikeReason, type Issue } from '../../../../shared/roster/verify';
 import { sameCompetition, type RosterCheckSection } from '../../../../shared/registry';
 import { fold } from '../../../../shared/text';
+import { flagParts } from '../../../../shared/roster/draft';
 import type { Competition } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 
@@ -153,6 +154,9 @@ export function IssueList({ issues }: { issues: Issue[] }) {
   );
 }
 
+/** Z, K/ZK, H/V/C — always in this order. */
+const flagText = (p: RosterPlayer) => { const f = flagParts(p.flags); return [p.base ? 'Z' : '', f.cap, f.letter].filter(Boolean).join(' '); };
+
 function IssueRow({ player: p, issues, onChanged }: { player: RosterPlayer; issues: Issue[]; onChanged: () => Promise<unknown> }) {
   const reason = strikeReason(issues);
   const candidate = p.cz?.status === 'no_id' && p.cz.candidates?.length === 1 ? p.cz.candidates[0] : null;
@@ -160,7 +164,7 @@ function IssueRow({ player: p, issues, onChanged }: { player: RosterPlayer; issu
   return (
     <tr className={p.struck ? 'struck' : undefined}>
       <td className="mono muted" style={{ width: 36 }}>{p.position}.</td>
-      <td style={{ width: 220, fontWeight: 600 }}>{p.name}<div className="muted mono" style={{ fontSize: 12, fontWeight: 400 }}>{p.lok ? `LOK ${p.lok}` : 'bez LOK'}{p.flags && ` · ${p.flags}`}</div></td>
+      <td style={{ width: 220, fontWeight: 600 }}>{p.name}<div className="muted mono" style={{ fontSize: 12, fontWeight: 400 }}>{p.lok ? `LOK ${p.lok}` : 'bez LOK'}{flagText(p) && ` · ${flagText(p)}`}</div></td>
       <td>
         {p.struck ? <div className="issues"><div className="bad">vyškrtnut{p.struck_reason && `: ${p.struck_reason}`}</div></div> : <IssueList issues={issues} />}
       </td>

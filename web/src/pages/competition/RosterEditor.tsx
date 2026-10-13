@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { api, apiErrorText } from '../../lib/api';
 import type { RosterPlayer } from '../../lib/types';
-import { emptyExtra, expectedBase, FLAG_CODES, maxLetters, toggleFlag, type RosterDraft } from '../../../../shared/roster/draft';
+import { emptyExtra, expectedBase, maxLetters, toggleFlag, type RosterDraft } from '../../../../shared/roster/draft';
+
+const FLAG_COLS = [['K', 'ZK'], ['H', 'V', 'C']]; // own columns after Z
 
 type Row = { key: number; jmeno: string; rok: string; lok: string; fide: string; ozn: string; z: boolean };
 
@@ -64,7 +66,7 @@ export function RosterEditor({ competitionId, team, players, boards, onDone }: {
         {mismatches > 0 && <> <span className="tag warn">{mismatches}× Z neodpovídá pravidlu</span></>}
       </p>
       <table className="table">
-        <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th><th /></tr></thead>
+        <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th colSpan={3}>Označení</th><th /></tr></thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={r.key}>
@@ -74,15 +76,17 @@ export function RosterEditor({ competitionId, team, players, boards, onDone }: {
               <td><input className="input input-sm mono" style={{ width: 76 }} value={r.lok} onChange={(e) => set(r.key, { lok: e.target.value.replace(/\D/g, '') })} /></td>
               <td><input className="input input-sm mono" style={{ width: 96 }} value={r.fide} onChange={(e) => set(r.key, { fide: e.target.value.replace(/\D/g, '') })} /></td>
               <td style={{ whiteSpace: 'nowrap' }}>
-                {FLAG_CODES.map((f) => (
-                  <button key={f} type="button" className={`chip${r.ozn.split(' ').includes(f) ? ' active' : ''}`} style={{ marginRight: 3, cursor: 'pointer' }}
-                    onClick={() => set(r.key, { ozn: toggleFlag(r.ozn, f) })}>{f}</button>
-                ))}
-              </td>
-              <td style={{ whiteSpace: 'nowrap' }}>
-                <input type="checkbox" checked={r.z} onChange={(e) => set(r.key, { z: e.target.checked })} />
+                <input type="checkbox" checked={r.z} title="Základní sestava (Z)" onChange={(e) => set(r.key, { z: e.target.checked })} />
                 {typeof exp[i] === 'boolean' && exp[i] !== r.z && <span className="tag warn" style={{ marginLeft: 6 }}>{exp[i] ? 'má být Z' : 'bez Z'}</span>}
               </td>
+              {FLAG_COLS.map((codes, ci) => (
+                <td key={ci} style={{ whiteSpace: 'nowrap' }}>
+                  {codes.map((f) => (
+                    <button key={f} type="button" className={`chip${r.ozn.split(' ').includes(f) ? ' active' : ''}`} style={{ marginRight: 3, cursor: 'pointer' }}
+                      onClick={() => set(r.key, { ozn: toggleFlag(r.ozn, f) })}>{f}</button>
+                  ))}
+                </td>
+              ))}
               <td className="actions" style={{ whiteSpace: 'nowrap' }}>
                 <button className="icon-btn" title="Nahoru" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
                 <button className="icon-btn" title="Dolů" disabled={i === rows.length - 1} onClick={() => move(i, 1)}>↓</button>

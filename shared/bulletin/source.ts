@@ -1,6 +1,7 @@
 // Bulletin input from chess.cz responses (the source of truth for rosters and the schedule) and, when chess.cz
 // has nothing yet and the vedoucí confirms it, from the app (rosters, draw numbers → Berger). Pure functions.
 import { asArray } from '../roster/verify';
+import { flagParts } from '../roster/draft';
 import { fixtures } from '../draw/check';
 import type { BPlayer, BRound } from './initial';
 
@@ -57,10 +58,10 @@ export function czStartNumbers(teams: CzTeam[], rounds: CzRound[], appNumbers?: 
   return { stc: byId, source: null };
 }
 
-/** chess.cz flags " H K Z" → Z + the other letters joined by a comma (as uvodni-zpravodaj). */
-export function splitFlags(s: unknown): { z: boolean; typ: string } {
+/** chess.cz flags " H K Z" → Z, letter H/V/C and captain K/ZK (separate bulletin columns Z, P, K). */
+export function splitFlags(s: unknown): { z: boolean; letter: string; cap: string } {
   const t = String(s ?? '').trim().split(/\s+/).filter(Boolean);
-  return { z: t.includes('Z'), typ: t.filter((x) => x !== 'Z').join(',') };
+  return { z: t.includes('Z'), ...flagParts(t.join(' ')) };
 }
 
 export type AppPlayer = { lok: number | null; name: string; birth_year: number | null; struck: number };
@@ -80,7 +81,7 @@ export function czRoster(json: unknown, app: AppPlayer[] = []): BPlayer[] {
         name: String(p.playerName ?? '').trim(),
         nrtg: Number(p.playerCzeElo) || 0,
         irtg: Number(p.playerFideElo) || 0,
-        z: f.z, typ: f.typ,
+        z: f.z, letter: f.letter, cap: f.cap,
         birthYear: a?.birth_year ?? null,
         struck: !!a?.struck,
       };
@@ -96,7 +97,7 @@ export function appRoster(players: (AppPlayer & { position: number; flags: strin
     nrtg: p.cz?.member?.czeStdElo ?? 0,
     irtg: p.cz?.member?.fideStdElo ?? 0,
     z: !!p.base,
-    typ: p.flags.split(' ').filter(Boolean).join(','),
+    ...flagParts(p.flags),
     birthYear: p.birth_year,
     struck: !!p.struck,
   }));

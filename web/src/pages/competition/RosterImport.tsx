@@ -8,6 +8,7 @@ import { shortTime } from '../../../../shared/startTime';
 import type { RosterDraft } from '../../../../shared/roster/draft';
 import type { RosterImportPreview } from '../../../../shared/roster/importPreview';
 import { useCompetition } from './CompetitionLayout';
+import { FlagCells } from '../../components/FlagCells';
 
 type Candidate = { id: string; name: string; status: string; score: number };
 type Item = {
@@ -192,7 +193,7 @@ function PlayersTable({ draft }: { draft: RosterDraft }) {
   return (
     <div className="table-scroll">
       <table className="table">
-        <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th></tr></thead>
+        <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th colSpan={3}>Označení</th></tr></thead>
         <tbody>
           {draft.players.map((pl, i) => (
             <tr key={i}>
@@ -201,8 +202,7 @@ function PlayersTable({ draft }: { draft: RosterDraft }) {
               <td className="num">{pl.rok}</td>
               <td className="num">{pl.lok || <span className="tag bad">chybí</span>}</td>
               <td className="num">{pl.fide}</td>
-              <td>{pl.ozn.split(' ').filter(Boolean).map((f) => <span key={f} className="chip active" style={{ marginRight: 4 }}>{f}</span>)}</td>
-              <td>{pl.z && <span className="chip active">Z</span>}</td>
+              <FlagCells flags={pl.ozn} z={pl.z} />
             </tr>
           ))}
         </tbody>

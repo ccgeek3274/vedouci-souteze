@@ -56,7 +56,7 @@ export type BTeam = {
   startAway: string | null;
 };
 export type BPlayer = {
-  pos: number; name: string; nrtg: number; irtg: number; z: boolean; typ: string;
+  pos: number; name: string; nrtg: number; irtg: number; z: boolean; letter: string; cap: string;
   birthYear: number | null; struck: boolean;
 };
 export type BRound = { nr: number; date: string; matches: { home: string; away: string }[] };

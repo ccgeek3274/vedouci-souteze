@@ -6,7 +6,7 @@ import { deltaBlocks, textDelta } from '../bulletin/rich';
 import { czDateIso, czRoster, czStartNumbers, parseCzSchedule, splitFlags } from '../bulletin/source';
 
 const player = (pos: number, name: string, extra: Partial<BPlayer> = {}): BPlayer =>
-  ({ pos, name, nrtg: 1500, irtg: 0, z: pos <= 2, typ: '', birthYear: null, struck: false, ...extra });
+  ({ pos, name, nrtg: 1500, irtg: 0, z: pos <= 2, letter: '', cap: '', birthYear: null, struck: false, ...extra });
 
 function data(): BulletinData {
   const team = (key: string, stc: number, refs: string[], startHome: string | null = null) => ({
@@ -111,7 +111,8 @@ describe('model', () => {
 describe('chess.cz source', () => {
   it('dates, flags and roster', () => {
     expect(czDateIso('08.11.2026')).toBe('2026-11-08');
-    expect(splitFlags(' H K Z')).toEqual({ z: true, typ: 'H,K' });
+    expect(splitFlags(' H K Z')).toEqual({ z: true, letter: 'H', cap: 'K' });
+    expect(splitFlags('ZK V')).toEqual({ z: false, letter: 'V', cap: 'ZK' });
     const r = czRoster([{ rosterPosition: 2, playerId: 5, playerName: 'B ', playerCzeElo: 1500, playerFideElo: null, playerFlags: ' Z' }, { rosterPosition: 1, playerId: 7, playerName: 'A', playerFlags: '' }],
       [{ lok: 5, name: 'B', birth_year: 1980, struck: 1 }]);
     expect(r.map((p) => [p.pos, p.name, p.z, p.birthYear, p.struck])).toEqual([[1, 'A', false, null, false], [2, 'B', true, 1980, true]]);

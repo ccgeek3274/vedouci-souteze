@@ -10,6 +10,7 @@ import type { Contact, RosterPlayer, RosterVersion, Team } from '../../lib/types
 import { useCompetition } from './CompetitionLayout';
 import { IssueList, useRosterCheck } from './RosterCheck';
 import { RosterEditor } from './RosterEditor';
+import { FlagCells } from '../../components/FlagCells';
 import { NewRequestForm, RequestTable } from './RequestItems';
 import { checkTeamRoster, checkedAt, competitionIssues, prepareCheck } from '../../lib/rosterCheck';
 import { strikeReason } from '../../../../shared/roster/verify';
@@ -122,7 +123,7 @@ export function TeamDetail() {
               {checkError && <div className="alert">{checkError}</div>}
               {data.roster.filename && <p className="helper-text" style={{ marginTop: 0 }}>Zdroj: {data.roster.filename}</p>}
               <table className="table">
-                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th>Označení</th><th>Z</th><th title="Ruční potvrzení dokladu (např. papírové povolení předložené na losovací schůzi). Potvrzená hostování a registrace cizinců z registrů ŠSČR se kontrolují automaticky.">Doloženo ručně</th>{issues && <><th>Kontrola chess.cz</th><th /></>}</tr></thead>
+                <thead><tr><th>#</th><th>Příjmení jméno</th><th className="num">Rok</th><th className="num">LOK</th><th className="num">FIDE</th><th colSpan={3}>Označení</th><th title="Ruční potvrzení dokladu (např. papírové povolení předložené na losovací schůzi). Potvrzená hostování a registrace cizinců z registrů ŠSČR se kontrolují automaticky.">Doloženo ručně</th>{issues && <><th>Kontrola chess.cz</th><th /></>}</tr></thead>
                 <tbody>
                   {data.roster.players.map((p) => (
                     <tr key={p.id} className={p.struck ? 'struck' : undefined}>
@@ -131,8 +132,7 @@ export function TeamDetail() {
                       <td className="num">{p.birth_year ?? ''}</td>
                       <td className="num">{p.lok ?? <span className="tag bad">chybí</span>}</td>
                       <td className="num">{p.fide ?? ''}</td>
-                      <td>{p.flags.split(' ').filter(Boolean).map((f) => <span key={f} className="chip active" style={{ marginRight: 4 }}>{f}</span>)}</td>
-                      <td>{p.base ? <span className="chip active">Z</span> : null}</td>
+                      <FlagCells flags={p.flags} z={!!p.base} />
                       <td>{needsDocument(p.flags) && (
                         <label className="row" style={{ gap: 6 }} title={needsDocument(p.flags)}>
                           <input type="checkbox" checked={!!p.guest_permit}

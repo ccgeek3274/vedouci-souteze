@@ -43,3 +43,8 @@ Kalendář (volitelně, na nové stránce).
 `shared/bulletin/initial.ts` (konfigurace, model kapitol, výchozí texty, rotace), `shared/bulletin/source.ts`
 (chess.cz / aplikace → vstup), `shared/bulletin/rich.ts` (Quill Delta), `web/src/bulletin/{load,docx,pdf,layout}.ts`,
 `web/src/pages/competition/Bulletin.tsx`, API `worker/routes/bulletins.ts`, písmo `web/public/fonts/Carlito-*`.
+
+## Zobrazení označení hráčů
+- V celé aplikaci (detail družstva, náhled importu, editor soupisky) jsou tři samostatné sloupce ve stálém pořadí
+  **Z | K/ZK | H/V/C** pod společným nadpisem „Označení“ (`web/src/components/FlagCells.tsx`, `flagParts` v `shared/roster/draft.ts`).
+- Ve zpravodaji (náhled, DOCX, PDF) samostatné sloupce **Z | P | K**: P = písmeno H/V/C, K = kapitán K/ZK.

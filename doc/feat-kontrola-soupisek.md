@@ -71,7 +71,7 @@ vyškrtnutím (párování LOK, bez LOK jméno). Změna LOK/FIDE snapshot zahod�
   k návrhu na vyškrtnutí — v M8 se vloží do zpravodaje.
 
 ## Ruční úprava soupisky
-Detail družstva → „Upravit soupisku“: jméno, rok, LOK, FIDE, označení (K/ZK, H/V/C), Z, pořadí, přidání / odebrání
+Detail družstva → „Upravit soupisku“: jméno, rok, LOK, FIDE, Z, K/ZK, H/V/C, pořadí, přidání / odebrání
 hráče, „Nastavit Z podle pravidla“ (přeskočeným písmenkovým ponechá volbu kapitána). Uložení = nová verze soupisky
 (zdroj `manual`) přes běžný import, takže „doloženo“, vyškrtnutí a snapshot kontroly jdou s hráčem (párování LOK).
 

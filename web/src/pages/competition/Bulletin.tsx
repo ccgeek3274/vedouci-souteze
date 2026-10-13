@@ -303,13 +303,13 @@ function SectionView({ s, cfg, update, version }: {
           <div key={i} className="d-pair">
             {p.map((t) => (
               <table key={t.name} className="d-tbl d-roster"><tbody>
-                <tr className="tn"><td colSpan={6}>{t.stc}&nbsp;&nbsp;{t.name}</td></tr>
-                <tr className="sub b"><td></td><td>Jméno</td><td className="c">NRtg</td><td className="c">IRtg</td><td className="c">Z</td><td>Typ</td></tr>
+                <tr className="tn"><td colSpan={7}>{t.stc}&nbsp;&nbsp;{t.name}</td></tr>
+                <tr className="sub b"><td></td><td>Jméno</td><td className="c">NRtg</td><td className="c">IRtg</td><td className="c">Z</td><td className="c">P</td><td className="c">K</td></tr>
                 {t.players.length ? t.players.map((pl) => (
                   <tr key={pl.pos} className={pl.struck ? 'struck' : ''} title={pl.struck ? 'vyškrtnut — v definitivním zpravodaji vynechán' : undefined}>
-                    <td className="c">{pl.pos}</td><td>{pl.display}</td><td className="c">{pl.nrtg || ''}</td><td className="c">{pl.irtg || ''}</td><td className="c">{pl.z ? 'Z' : ''}</td><td>{pl.typ}</td>
+                    <td className="c">{pl.pos}</td><td>{pl.display}</td><td className="c">{pl.nrtg || ''}</td><td className="c">{pl.irtg || ''}</td><td className="c">{pl.z ? 'Z' : ''}</td><td className="c">{pl.letter}</td><td className="c">{pl.cap}</td>
                   </tr>
-                )) : <tr><td colSpan={6}><span className="d-missing">soupiska chybí</span></td></tr>}
+                )) : <tr><td colSpan={7}><span className="d-missing">soupiska chybí</span></td></tr>}
               </tbody></table>
             ))}
           </div>

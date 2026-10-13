@@ -6,6 +6,12 @@ export const FLAG_CODES = ['K', 'ZK', 'H', 'V', 'C'] as const;
 export type FlagCode = (typeof FLAG_CODES)[number];
 const FLAG_GROUPS: FlagCode[][] = [['K', 'ZK'], ['H', 'V', 'C']];
 
+/** Space-joined flags ("ZK H", chess.cz " H K Z") → captain (K/ZK) and letter (H/V/C) — each shown in its own column. */
+export function flagParts(flags: unknown): { cap: string; letter: string } {
+  const t = String(flags ?? '').toUpperCase().split(/[\s,]+/);
+  return { cap: t.find((x) => x === 'K' || x === 'ZK') ?? '', letter: t.find((x) => x === 'H' || x === 'V' || x === 'C') ?? '' };
+}
+
 export type DraftPlayer = {
   jmeno: string;
   rok: number | '';

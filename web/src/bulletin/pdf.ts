@@ -48,7 +48,7 @@ function rich(blocks: RichBlock[]): any[] {
 }
 
 function rosterTable(t: { stc: number | null; name: string; players: RosterRow[] }) {
-  const al = ['center', 'left', 'center', 'center', 'center', 'left'];
+  const al = ['center', 'left', 'center', 'center', 'center', 'center', 'center'];
   return {
     width: pt(ROSTER_W),
     stack: [
@@ -58,7 +58,7 @@ function rosterTable(t: { stc: number | null; name: string; players: RosterRow[]
           widths: widths(ROSTER_COLS), dontBreakRows: true,
           body: [
             ROSTER_HDRS.map((x, i) => ({ text: x, bold: true, fillColor: SUB, alignment: al[i] })),
-            ...t.players.map((p) => [p.pos, p.display, p.nrtg || '', p.irtg || '', p.z ? 'Z' : '', p.typ].map((v, i) => ({ text: String(v), alignment: al[i] }))),
+            ...t.players.map((p) => [p.pos, p.display, p.nrtg || '', p.irtg || '', p.z ? 'Z' : '', p.letter, p.cap].map((v, i) => ({ text: String(v), alignment: al[i] }))),
           ],
         },
         layout: LAYOUT,
