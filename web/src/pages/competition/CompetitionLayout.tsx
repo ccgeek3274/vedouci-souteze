@@ -1,8 +1,9 @@
-import { Link, NavLink, Outlet, useOutletContext, useParams } from 'react-router-dom';
+import { NavLink, Outlet, useOutletContext, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { LEVEL_LABEL, PHASE_LABEL } from '../../lib/format';
 import type { CompetitionDetail } from '../../lib/types';
+import { AppNav } from '../../components/Layout';
 
 export type CompetitionCtx = { data: CompetitionDetail; refresh: () => Promise<void> };
 export const useCompetition = () => useOutletContext<CompetitionCtx>();
@@ -25,11 +26,15 @@ export function CompetitionLayout() {
 
   return (
     <>
-      <div className="crumbs no-print"><Link to="/">Soutěže</Link> / {c.season}</div>
-      <h2 className="page-title">{c.name} <span style={{ color: 'var(--subtitle)' }}>{c.short}</span></h2>
-      <p className="page-sub">
-        {LEVEL_LABEL[c.level] ?? c.level} · {c.season} · {active.length} družstev · {c.boards} šachovnic · fáze: {PHASE_LABEL[c.phase] ?? c.phase}
-      </p>
+      <header className="comp-header">
+        <div>
+          <h1 className="page-title">{c.name} <span style={{ color: 'var(--subtitle)' }}>{c.short}</span></h1>
+          <p className="page-sub">
+            {LEVEL_LABEL[c.level] ?? c.level} · {c.season} · {active.length} družstev · {c.boards} šachovnic · fáze: {PHASE_LABEL[c.phase] ?? c.phase}
+          </p>
+        </div>
+        <AppNav compact />
+      </header>
       <nav className="tabs no-print">
         <NavLink to="" end>Přehled</NavLink>
         <NavLink to="druzstva">Družstva</NavLink>

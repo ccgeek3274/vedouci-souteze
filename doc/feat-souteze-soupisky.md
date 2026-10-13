@@ -56,3 +56,11 @@ Hráč s označením H (povolení hostování) nebo C (doklad cizince) má v sou
 Vložení (Ctrl+V) buněk zkopírovaných z Excelu do kteréhokoli pole kontaktu (`shared/contacts.ts`,
 `parseContactPaste`): buňky se rozpoznají podle obsahu (e-mail „@“, telefon ≥ 9 číslic, jinak jméno),
 pořadí nehraje roli; více řádků = více kontaktů se stejnou rolí. Funguje i jeden řádek textu oddělený čárkami.
+
+## Detail družstva
+- Pořadí bloků: údaje družstva → Soupiska → Kontakty → Požadavky.
+- Blok družstva ukazuje jen vyplněné / nevýchozí řádky (přezůvky jen „ano“, začátek jen výjimka); přepínač „Zobrazit vše“ ukáže i zbytek.
+- Začátky utkání a požadavky se zde needitují: blok jen shrnuje záznamy `requests` družstva; výjimku začátku (`start_home/away`)
+  nastavuje přijatý požadavek na začátek. Pole `start_pref` / `draw_requests` z importu soupisky slouží jen jako zdroj požadavků.
+- Přezůvky: přepínač Ano/Ne, ukládá se `ano` / `ne` (starší hodnoty z e-soupisek „NE“, „ano“ se čtou tolerantně).
+- V soutěži se místo velké hlavičky aplikace zobrazuje nahoře název soutěže, navigace aplikace je zmenšená vpravo.

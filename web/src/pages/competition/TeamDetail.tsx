@@ -6,12 +6,13 @@ import { czDateTime, ROLE_LABEL } from '../../lib/format';
 import { shortTime } from '../../../../shared/startTime';
 import { parseContactPaste } from '../../../../shared/contacts';
 import { ClubInput } from '../../components/ClubInput';
-import type { Contact, RosterPlayer, RosterVersion, Team } from '../../lib/types';
+import type { Contact, Request, RosterPlayer, RosterVersion, Team } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 import { IssueList, useRosterCheck } from './RosterCheck';
 import { RosterEditor } from './RosterEditor';
 import { FlagCells } from '../../components/FlagCells';
-import { NewRequestForm, RequestTable } from './RequestItems';
+import { NewRequestForm, RequestTable, requestSummary } from './RequestItems';
+import { REQUEST_STATUS_LABEL } from '../../lib/format';
 import { checkTeamRoster, checkedAt, competitionIssues, prepareCheck } from '../../lib/rosterCheck';
 import { strikeReason } from '../../../../shared/roster/verify';
 
@@ -22,16 +23,8 @@ type TeamResponse = {
   roster: (RosterVersion & { players: RosterPlayer[] }) | null;
 };
 
-const TEXT_FIELDS: { key: keyof Team; label: string; wide?: boolean }[] = [
-  { key: 'name', label: 'Název družstva' },
-  { key: 'club_name', label: 'Oddíl' },
-  { key: 'club_code', label: 'Č. oddílu (chess.cz)' },
-  { key: 'venue', label: 'Hrací místnost', wide: true },
-  { key: 'shoes', label: 'Přezůvky' },
-  { key: 'start_pref', label: 'Preference začátku domácích utkání' },
-  { key: 'draw_requests', label: 'Požadavky na losování', wide: true },
-  { key: 'notes', label: 'Poznámky', wide: true },
-];
+/** Shoes are stored as free text from rosters ("NE", "ano") — normalized to ano / ne / '' (not given). */
+const shoesValue = (v: string) => (/^\s*a/i.test(v) ? 'ano' : /^\s*n/i.test(v) ? 'ne' : '');
 const ROLES: Contact['role'][] = ['kapitan', 'zastupce', 'komunikace', 'rozhodci'];
 
 /** Players that need a document: H (guest) → hosting permit, C (foreigner) → foreigner document. */
@@ -83,18 +76,7 @@ export function TeamDetail() {
   return (
     <>
       <div className="crumbs"><Link to="../druzstva">← Družstva</Link></div>
-      <TeamFields team={t} onSaved={refresh} />
-      <Contacts teamId={t.id} contacts={data.contacts} onSaved={refresh} />
-      <div className="card">
-        <div className="card-strip"><h2>Požadavky</h2><span className="helper">začátky utkání, losování, termíny</span></div>
-        <div className="card-body table-scroll">
-          {comp.requests.some((r) => r.team_id === t.id)
-            ? <RequestTable requests={comp.requests.filter((r) => r.team_id === t.id)} showTeam={false} />
-            : <p className="muted" style={{ marginTop: 0 }}>Žádné požadavky.</p>}
-          <div className="section-title">Nový požadavek</div>
-          <NewRequestForm teamId={t.id} />
-        </div>
-      </div>
+      <TeamFields team={t} requests={comp.requests.filter((r) => r.team_id === t.id)} defaultStart={comp.competition.default_start} onSaved={refresh} />
       <div className="card">
         <div className="card-strip">
           <h2>Soupiska</h2>
@@ -166,18 +148,40 @@ export function TeamDetail() {
           )}
         </div>
       </div>
+      <Contacts teamId={t.id} contacts={data.contacts} onSaved={refresh} />
+      <div className="card" id="pozadavky-druzstva">
+        <div className="card-strip"><h2>Požadavky</h2><span className="helper">začátky utkání, losování, termíny</span></div>
+        <div className="card-body table-scroll">
+          {comp.requests.some((r) => r.team_id === t.id)
+            ? <RequestTable requests={comp.requests.filter((r) => r.team_id === t.id)} showTeam={false} />
+            : <p className="muted" style={{ marginTop: 0 }}>Žádné požadavky.</p>}
+          <div className="section-title">Nový požadavek</div>
+          <NewRequestForm teamId={t.id} />
+        </div>
+      </div>
     </>
   );
 }
 
-function TeamFields({ team, onSaved }: { team: Team; onSaved: () => Promise<void> }) {
+const FIELDS = ['name', 'club_name', 'club_code', 'venue', 'shoes', 'draw_no', 'notes'] as const;
+type Field = (typeof FIELDS)[number];
+
+/**
+ * The team's own data. Start-time exceptions and draw preferences are not edited here: they come from the requests
+ * (an accepted start-time request sets start_home / start_away) — this block only summarizes them.
+ * Rows without information or with the default value are hidden unless "Zobrazit vše" is on.
+ */
+function TeamFields({ team, requests, defaultStart, onSaved }: { team: Team; requests: Request[]; defaultStart: string; onSaved: () => Promise<void> }) {
+  const { data: comp } = useCompetition();
   const [edit, setEdit] = useState(false);
-  const [form, setForm] = useState<Record<string, string>>({});
+  const [all, setAll] = useState(false);
+  const [form, setForm] = useState<Record<Field, string>>({} as Record<Field, string>);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => setForm(Object.fromEntries([
-    ...TEXT_FIELDS.map((f) => [f.key, String(team[f.key] ?? '')]),
-    ['draw_no', String(team.draw_no ?? '')], ['start_home', team.start_home ?? ''], ['start_away', team.start_away ?? ''],
-  ])), [team]);
+  const reset = () => setForm({
+    name: team.name, club_name: team.club_name ?? '', club_code: team.club_code ?? '', venue: team.venue ?? '',
+    shoes: shoesValue(team.shoes ?? ''), draw_no: team.draw_no == null ? '' : String(team.draw_no), notes: team.notes ?? '',
+  });
+  useEffect(reset, [team]);
 
   const save = async () => {
     setError(null);
@@ -190,6 +194,40 @@ function TeamFields({ team, onSaved }: { team: Team; onSaved: () => Promise<void
     }
   };
 
+  const teamName = (id: string | null) => comp.teams.find((x) => x.id === id)?.name ?? '?';
+  const shoes = shoesValue(team.shoes ?? '');
+  const club = [team.club_name, team.club_code && `č. ${team.club_code}`].filter(Boolean).join(' · ');
+  const starts = [team.start_home && `domácí utkání ${shortTime(team.start_home)}`, team.start_away && `utkání venku ${shortTime(team.start_away)}`].filter(Boolean);
+  const none = <span className="muted">—</span>;
+  const rows: { label: string; value: React.ReactNode; filled: boolean }[] = [
+    { label: 'Oddíl', value: club || none, filled: !!club },
+    { label: 'Hrací místnost', value: team.venue || none, filled: !!team.venue },
+    { label: 'Přezůvky', value: shoes || <span className="muted">nezadáno</span>, filled: shoes === 'ano' },
+    { label: 'Losovací číslo', value: team.draw_no ?? none, filled: team.draw_no != null },
+    {
+      label: 'Začátek utkání',
+      value: starts.length ? <>{starts.map((x) => <div key={x}>{x}</div>)}</> : <span className="muted">výchozí {shortTime(defaultStart)}</span>,
+      filled: starts.length > 0,
+    },
+    {
+      label: 'Požadavky',
+      value: requests.length ? (
+        <div>
+          {requests.map((r) => (
+            <div key={r.id}>
+              {requestSummary(r, teamName)}{r.kind === 'draw_no' && r.text ? <span className="muted"> ({r.text})</span> : null}{' '}
+              <span className={`tag ${r.status === 'accepted' ? 'ok' : r.status === 'rejected' ? 'bad' : ''}`}>{REQUEST_STATUS_LABEL[r.status] ?? r.status}</span>
+            </div>
+          ))}
+        </div>
+      ) : none,
+      filled: requests.length > 0,
+    },
+    { label: 'Poznámky', value: team.notes || none, filled: !!team.notes },
+  ];
+  const shown = all ? rows : rows.filter((r) => r.filled);
+  const hidden = rows.length - rows.filter((r) => r.filled).length;
+
   return (
     <div className="card">
       <div className="card-strip">
@@ -197,9 +235,14 @@ function TeamFields({ team, onSaved }: { team: Team; onSaved: () => Promise<void
         {team.status === 'reserve' && <span className="tag warn">záloha</span>}
         {team.chesscz_team_id && <span className="tag ok">chess.cz #{team.chesscz_team_id}</span>}
         <span className="spacer" />
+        {!edit && hidden > 0 && (
+          <label className="row" style={{ gap: 6, fontSize: 13 }}>
+            <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} /> Zobrazit vše
+          </label>
+        )}
         {edit ? (
           <>
-            <button className="btn btn-small" onClick={() => setEdit(false)}>Zrušit</button>
+            <button className="btn btn-small" onClick={() => { reset(); setEdit(false); }}>Zrušit</button>
             <button className="btn btn-small btn-primary" onClick={save}>Uložit</button>
           </>
         ) : <button className="btn btn-small" onClick={() => setEdit(true)}>Upravit</button>}
@@ -207,38 +250,32 @@ function TeamFields({ team, onSaved }: { team: Team; onSaved: () => Promise<void
       <div className="card-body">
         {error && <div className="alert">{error}</div>}
         {edit ? (
-          <div className="grid-2">
-            {TEXT_FIELDS.map((f) => (
-              <div className="field" key={f.key} style={f.wide ? { gridColumn: 'span 2' } : undefined}>
-                <label>{f.label}</label>
-                {f.key === 'club_name'
-                  ? <ClubInput name={form.club_name ?? ''} code={form.club_code ?? ''} onChange={(p) => setForm((x) => ({ ...x, ...p }))} />
-                  : <input className="input" value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />}
-              </div>
-            ))}
-            <div className="field"><label>Losovací číslo</label>
-              <input className="input mono" value={form.draw_no ?? ''} onChange={(e) => setForm({ ...form, draw_no: e.target.value.replace(/\D/g, '') })} /></div>
+          <>
             <div className="grid-2">
-              <div className="field"><label>Jiný začátek doma</label>
-                <input type="time" className="input mono" value={form.start_home ?? ''} onChange={(e) => setForm({ ...form, start_home: e.target.value })} /></div>
-              <div className="field"><label>Jiný začátek venku</label>
-                <input type="time" className="input mono" value={form.start_away ?? ''} onChange={(e) => setForm({ ...form, start_away: e.target.value })} /></div>
+              <div className="field"><label>Název družstva</label>
+                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div className="field"><label>Oddíl</label>
+                <ClubInput name={form.club_name} code={form.club_code} onChange={(p) => setForm((x) => ({ ...x, ...p }))} /></div>
+              <div className="field" style={{ gridColumn: 'span 2' }}><label>Hrací místnost</label>
+                <input className="input" value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} /></div>
+              <div className="field"><label>Přezůvky</label>
+                <div className="segmented">
+                  {(['ano', 'ne'] as const).map((v) => (
+                    <button key={v} type="button" className={form.shoes === v ? 'active' : ''} onClick={() => setForm({ ...form, shoes: form.shoes === v ? '' : v })}>{v === 'ano' ? 'Ano' : 'Ne'}</button>
+                  ))}
+                </div></div>
+              <div className="field"><label>Losovací číslo</label>
+                <input className="input mono" value={form.draw_no} onChange={(e) => setForm({ ...form, draw_no: e.target.value.replace(/\D/g, '') })} /></div>
+              <div className="field" style={{ gridColumn: 'span 2' }}><label>Poznámky</label>
+                <input className="input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
             </div>
-          </div>
-        ) : (
+            <p className="helper-text">Začátky utkání a požadavky na losování se zadávají v <a href="#pozadavky-druzstva">požadavcích</a> — přijatý požadavek na začátek utkání se promítne sem.</p>
+          </>
+        ) : shown.length ? (
           <dl className="dl">
-            {TEXT_FIELDS.slice(1).map((f) => (
-              <Fragment key={f.key}><dt>{f.label}</dt><dd>{String(team[f.key] ?? '') || <span className="muted">—</span>}</dd></Fragment>
-            ))}
-            <dt>Losovací číslo</dt><dd className="mono">{team.draw_no ?? <span className="muted">—</span>}</dd>
-            <dt>Jiný začátek</dt>
-            <dd className="mono">
-              {!team.start_home && !team.start_away && <span className="muted">výchozí</span>}
-              {team.start_home && <div>domácí utkání {shortTime(team.start_home)}</div>}
-              {team.start_away && <div>utkání venku {shortTime(team.start_away)}</div>}
-            </dd>
+            {shown.map((r) => <Fragment key={r.label}><dt>{r.label}</dt><dd>{r.value}</dd></Fragment>)}
           </dl>
-        )}
+        ) : <p className="muted" style={{ margin: 0 }}>Žádné doplňující údaje.</p>}
       </div>
     </div>
   );
