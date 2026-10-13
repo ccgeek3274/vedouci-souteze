@@ -9,7 +9,7 @@ const competitions = new Hono<AppEnv>();
 competitions.use('*', authRequired);
 
 const EDITABLE = [
-  'season', 'region', 'level', 'group_code', 'short', 'name', 'boards', 'default_start', 'time_control',
+  'season', 'region', 'level', 'group_code', 'short', 'name', 'boards', 'default_start', 'last_start', 'time_control',
   'manager_name', 'manager_email', 'manager_phone', 'mutual_deadline', 'chesscz_comp_id', 'phase', 'notes',
 ] as const;
 const NUMERIC = ['boards', 'chesscz_comp_id'] as const;
@@ -24,6 +24,7 @@ function validate(f: Record<string, unknown>): string | null {
   if ('level' in f && !LEVELS.includes(f.level as any)) return 'Neplatná úroveň soutěže';
   if ('boards' in f && !(Number(f.boards) >= 1 && Number(f.boards) <= 12)) return 'Počet šachovnic musí být 1–12';
   if ('default_start' in f && !/^\d{1,2}:\d{2}$/.test(String(f.default_start))) return 'Začátek musí mít tvar HH:MM';
+  if ('last_start' in f && f.last_start && !/^\d{1,2}:\d{2}$/.test(String(f.last_start))) return 'Začátek posledního kola musí mít tvar HH:MM (nebo prázdný)';
   if ('mutual_deadline' in f && f.mutual_deadline && !/^\d{4}-\d{2}-\d{2}$/.test(String(f.mutual_deadline))) return 'Neplatné datum';
   if ('phase' in f && !PHASES.includes(String(f.phase))) return 'Neplatná fáze';
   return null;

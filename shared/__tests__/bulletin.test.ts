@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildModel, defaultConfig, normalizeConfig, rosterDisplay, rotatedReferees, calendarMonths, type BPlayer, type BulletinData,
+  buildModel, defaultConfig, normalizeConfig, rosterDisplay, rotatedReferees, calendarMonths, type BPlayer, type BulletinData, type Section,
 } from '../bulletin/initial';
 import { deltaBlocks, textDelta } from '../bulletin/rich';
+import { matchStart, normRounds, parseRounds, roundsText } from '../startTime';
 import { czDateIso, czRoster, czStartNumbers, parseCzSchedule, splitFlags } from '../bulletin/source';
 
 const player = (pos: number, name: string, extra: Partial<BPlayer> = {}): BPlayer =>
@@ -125,5 +126,34 @@ describe('chess.cz source', () => {
     const bad = parseCzSchedule([{ roundNr: 1, roundMatches: [{ homeTeamId: 10, awayTeamId: 11 }, { homeTeamId: 12, awayTeamId: 13 }] }]);
     expect(czStartNumbers(teams, bad, new Map([[10, 1], [11, 4], [12, 2], [13, 3]])).source).toBe('aplikace');
     expect(czStartNumbers(teams, bad).source).toBe(null);
+  });
+});
+
+describe('start-time exceptions', () => {
+  it('parses and formats rounds', () => {
+    expect(parseRounds('7, 3 3 2-4')).toEqual([2, 3, 4, 7]);
+    expect(normRounds(' 3., 7 ')).toBe('3,7');
+    expect(normRounds('třetí')).toBeNull();
+    expect(roundsText('3,7')).toBe('3. a 7. kole');
+  });
+  it('skipped rounds and the last round start', () => {
+    const t = { start_home: '10:00', start_home_skip: '2' };
+    expect(matchStart(t, null, '09:00', { nr: 1, last: false })).toMatchObject({ time: '10:00', exception: true });
+    expect(matchStart(t, null, '09:00', { nr: 2, last: false })).toMatchObject({ time: '09:00', exception: false });
+    expect(matchStart(t, null, '09:00', { nr: 3, last: true, lastStart: '10:30' })).toMatchObject({ time: '10:30', exception: false });
+  });
+  it('bulletin: excluded round without the exception, last round header with its own start', () => {
+    const d = { ...data(), lastStart: '10:30' };
+    d.teams[0].startHomeSkip = '2';
+    const m = buildModel(d, defaultConfig());
+    const rounds = m.chapters.flatMap((c) => c.sections).find((s) => s.type === 'rounds') as Extract<Section, { type: 'rounds' }>;
+    expect(rounds.rounds[0].rows[0].time).toBe('10:00');
+    expect(rounds.rounds[1].rows[0].time).toBe('');
+    expect(rounds.rounds[1].header).not.toContain('pokud není uvedeno jinak');
+    expect(rounds.rounds[2].header).toBe('Kolo 3 dne 22.11.2026 v 10:30 hodin (poslední kolo, všechna utkání musí začínat v 10:30)');
+    const lines = m.chapters.flatMap((c) => c.sections).find((s) => s.type === 'lines') as Extract<Section, { type: 'lines' }>;
+    expect(lines.lines).toContain('• Tým a — domácí utkání v 10:00 hodin (neplatí v 2. kole)');
+    const req = m.chapters.flatMap((c) => c.sections).find((s) => s.type === 'rich' && s.key === 'requirements') as Extract<Section, { type: 'rich' }>;
+    expect(JSON.stringify(req.ops)).toContain('všechna utkání 3. kola začínají v 10:30 hodin');
   });
 });

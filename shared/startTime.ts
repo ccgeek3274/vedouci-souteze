@@ -37,17 +37,48 @@ export function parseStartTime(text: unknown): { time: string; side: StartSide }
   return null;
 }
 
+/** "3, 7", "3 7", "2-4" → sorted unique round numbers (1–99). */
+export function parseRounds(v: unknown): number[] {
+  const out = new Set<number>();
+  for (const part of String(v ?? '').split(/[\s,;]+/).filter(Boolean)) {
+    const m = /^(\d{1,2})\.?(?:-(\d{1,2})\.?)?$/.exec(part);
+    if (!m) continue;
+    const from = +m[1], to = m[2] ? +m[2] : from;
+    for (let r = Math.min(from, to); r <= Math.max(from, to); r++) if (r >= 1) out.add(r);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+/** Stored form of the rounds ("3,7"); null when the text contains something that is not a round. */
+export function normRounds(v: unknown): string | null {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  const ok = s.split(/[\s,;]+/).filter(Boolean).every((p) => /^\d{1,2}\.?(?:-\d{1,2}\.?)?$/.test(p));
+  return ok ? parseRounds(s).join(',') : null;
+}
+
+/** "3,7" → "3. a 7. kole" (bulletin / summaries). */
+export function roundsText(v: unknown): string {
+  const r = parseRounds(v).map((n) => `${n}.`);
+  return r.length ? `${r.length > 1 ? `${r.slice(0, -1).join(', ')} a ${r[r.length - 1]}` : r[0]} kole` : '';
+}
+
+export type StartTeam = { start_home?: string | null; start_away?: string | null; start_home_skip?: string; start_away_skip?: string };
+
 /**
- * Start of one match (as in uvodni-zpravodaj matchTime): the home team's home exception or the away team's
- * away exception; different exceptions = conflict. The last round always starts at the default time.
+ * Start of one match in round `round` (as in uvodni-zpravodaj matchTime): the home team's home exception or the away
+ * team's away exception, unless the round is excluded for it; different exceptions = conflict.
+ * The last round never uses exceptions — all its matches start at lastStart (if set) or the default start.
  */
 export function matchStart(
-  home: { start_home: string | null } | null, away: { start_away: string | null } | null, defaultStart: string, lastRound: boolean,
+  home: StartTeam | null, away: StartTeam | null, defaultStart: string,
+  round: { nr: number; last: boolean; lastStart?: string | null },
 ): { time: string; exception: boolean; conflict: boolean } {
   const d = normTime(defaultStart);
-  if (lastRound) return { time: d, exception: false, conflict: false };
-  const h = normTime(home?.start_home);
-  const a = normTime(away?.start_away);
+  if (round.last) return { time: normTime(round.lastStart) || d, exception: false, conflict: false };
+  const valid = (t: string | null | undefined, skip: string | undefined) => (parseRounds(skip).includes(round.nr) ? '' : normTime(t));
+  const h = valid(home?.start_home, home?.start_home_skip);
+  const a = valid(away?.start_away, away?.start_away_skip);
   if (h && a && h !== a) return { time: h, exception: true, conflict: true };
   const t = h || a;
   return t && t !== d ? { time: t, exception: true, conflict: false } : { time: d, exception: false, conflict: false };

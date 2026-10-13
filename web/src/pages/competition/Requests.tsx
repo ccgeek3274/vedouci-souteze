@@ -25,7 +25,7 @@ export function Requests() {
           <div className="card-strip"><h2>{KIND_TITLE[kind] ?? REQUEST_KIND_LABEL[kind]}</h2>
             <span className="badge" title="počet">{list.length}</span>
             {list.some((r) => r.status === 'new') && <span className="helper">{list.filter((r) => r.status === 'new').length} nových</span>}
-            {kind === 'start_time' && <span className="helper">Výchozí začátek {shortTime(c.default_start)} · v posledním kole se výjimky neuplatní</span>}</div>
+            {kind === 'start_time' && <span className="helper">Výchozí začátek {shortTime(c.default_start)} · v posledním kole se výjimky neuplatní{c.last_start ? ` (začíná v ${shortTime(c.last_start)})` : ''}</span>}</div>
           <div className="card-body table-scroll" style={{ paddingTop: 8, paddingBottom: 8 }}>
             <RequestTable requests={list} showKind={false} />
           </div>

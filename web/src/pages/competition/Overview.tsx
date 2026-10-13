@@ -13,6 +13,7 @@ const FIELDS: { key: keyof Competition; label: string; mono?: boolean; wide?: bo
   { key: 'region', label: 'Svaz', wide: true },
   { key: 'boards', label: 'Počet šachovnic', mono: true },
   { key: 'default_start', label: 'Výchozí začátek', mono: true },
+  { key: 'last_start', label: 'Začátek posledního kola', mono: true },
   { key: 'mutual_deadline', label: 'Vzájemné zápasy oddílu do', mono: true },
   { key: 'chesscz_comp_id', label: 'ID soutěže na chess.cz', mono: true },
   { key: 'time_control', label: 'Tempo hry', wide: true },
@@ -71,7 +72,7 @@ export function Overview() {
                 {FIELDS.map((f) => (
                   <div className="field" key={f.key} style={f.wide ? { gridColumn: 'span 2' } : undefined}>
                     <label>{f.label}</label>
-                    <input className={`input${f.mono ? ' mono' : ''}`} value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+                    <input className={`input${f.mono ? ' mono' : ''}`} placeholder={f.key === 'last_start' ? `prázdné = výchozí (${form.default_start || c.default_start})` : undefined} value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
                   </div>
                 ))}
                 <div className="field"><label>Úroveň</label>
@@ -90,7 +91,7 @@ export function Overview() {
           ) : (
             <dl className="dl">
               {FIELDS.map((f) => (
-                <FragmentRow key={f.key} label={f.label} value={f.key === 'mutual_deadline' ? czDate(c.mutual_deadline) : String(c[f.key] ?? '')} mono={f.mono} />
+                <FragmentRow key={f.key} label={f.label} value={f.key === 'mutual_deadline' ? czDate(c.mutual_deadline) : f.key === 'last_start' && !c.last_start ? `výchozí (${c.default_start})` : String(c[f.key] ?? '')} mono={f.mono} />
               ))}
               {c.notes && <FragmentRow label="Poznámky" value={c.notes} />}
             </dl>

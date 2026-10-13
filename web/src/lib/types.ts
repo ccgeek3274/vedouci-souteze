@@ -2,7 +2,7 @@ import type { CzCheck, VCheck } from '../../../shared/roster/verify';
 
 export type Competition = {
   id: string; season: string; region: string; level: string; group_code: string; short: string; name: string;
-  boards: number; default_start: string; time_control: string; manager_name: string; manager_email: string;
+  boards: number; default_start: string; last_start: string; time_control: string; manager_name: string; manager_email: string;
   manager_phone: string; mutual_deadline: string | null; chesscz_comp_id: number | null; phase: string; notes: string;
   updated_at: number;
 };
@@ -14,7 +14,7 @@ export type Contact = { id?: number; role: 'kapitan' | 'zastupce' | 'komunikace'
 export type Team = {
   id: string; competition_id: string; name: string; club_name: string; club_code: string | null;
   chesscz_team_id: number | null; position: number; draw_no: number | null; status: 'active' | 'reserve';
-  venue: string; shoes: string; start_pref: string; start_home: string | null; start_away: string | null; draw_requests: string; notes: string;
+  venue: string; shoes: string; start_pref: string; start_home: string | null; start_away: string | null; start_home_skip: string; start_away_skip: string; draw_requests: string; notes: string;
 };
 export type TeamWithSummary = Team & {
   contacts: Contact[];
@@ -24,6 +24,7 @@ export type Request = {
   id: number; competition_id: string; team_id: string | null; kind: string; text: string; round: number | null;
   status: 'new' | 'accepted' | 'rejected'; decision: string; source: string; created_at: number;
   time: string | null; side: 'home' | 'away' | null;
+  skip_rounds: string; // start_time: rounds where the approved exception does not apply ("3,7")
   // draw request (kind 'draw_no'): structured condition, all optional
   draw_kind: string | null; value: number | null; other_team_id: string | null; ext_name: string; ext_no: number | null; ext_teams: number | null;
   resolved: number; // manual resolution of requests that cannot be checked automatically

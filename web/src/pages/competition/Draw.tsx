@@ -243,7 +243,7 @@ function Schedule({ teams }: { teams: (TeamWithSummary & { draw_no: number | nul
                         const t = h ?? a;
                         return t ? <tr key={m.board}><td colSpan={3} className="muted">{t.name} — volno</td></tr> : null;
                       }
-                      const st = matchStart(h, a, c.default_start, last);
+                      const st = matchStart(h, a, c.default_start, { nr: r + 1, last, lastStart: c.last_start });
                       return (
                         <tr key={m.board}>
                           <td><span className="mono muted">{h.draw_no}</span> {h.name}</td>

@@ -61,6 +61,8 @@ export function assemble(detail: CompetitionDetail, check: RosterCheckData | und
     contacts: (a?.contacts ?? []).map((x) => ({ role: x.role, name: x.name, phone: x.phone, email: x.email })),
     startHome: a?.start_home ?? null,
     startAway: a?.start_away ?? null,
+    startHomeSkip: a?.start_home_skip ?? '',
+    startAwaySkip: a?.start_away_skip ?? '',
   });
 
   let teams: BTeam[];
@@ -137,6 +139,7 @@ export function assemble(detail: CompetitionDetail, check: RosterCheckData | und
       chessczId: c.chesscz_comp_id,
       www: cz.details?.compWww || null,
       defaultStart: c.default_start,
+      lastStart: c.last_start ?? '',
       timeControl: c.time_control,
       manager: { name: c.manager_name, email: c.manager_email, phone: c.manager_phone },
       teams,

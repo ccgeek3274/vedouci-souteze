@@ -10,7 +10,7 @@ export const CONTACT_ROLE_ORDER = ['kapitan', 'zastupce', 'komunikace', 'rozhodc
 
 export type CompetitionRow = {
   id: string; owner_id: string; season: string; region: string; level: string; group_code: string;
-  short: string; name: string; boards: number; default_start: string; time_control: string;
+  short: string; name: string; boards: number; default_start: string; last_start: string; time_control: string;
   manager_name: string; manager_email: string; manager_phone: string; mutual_deadline: string | null;
   chesscz_comp_id: number | null; phase: string; notes: string; created_at: number; updated_at: number;
 };
@@ -18,7 +18,7 @@ export type CompetitionRow = {
 export type TeamRow = {
   id: string; competition_id: string; name: string; club_name: string; club_code: string | null;
   chesscz_team_id: number | null; position: number; draw_no: number | null; status: 'active' | 'reserve';
-  venue: string; shoes: string; start_pref: string; start_home: string | null; start_away: string | null; draw_requests: string; notes: string;
+  venue: string; shoes: string; start_pref: string; start_home: string | null; start_away: string | null; start_home_skip: string; start_away_skip: string; draw_requests: string; notes: string;
   created_at: number; updated_at: number;
 };
 

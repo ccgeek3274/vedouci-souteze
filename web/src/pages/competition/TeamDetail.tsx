@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import { czDateTime, ROLE_LABEL } from '../../lib/format';
-import { shortTime } from '../../../../shared/startTime';
+import { roundsText, shortTime } from '../../../../shared/startTime';
 import { parseContactPaste } from '../../../../shared/contacts';
 import { ClubInput } from '../../components/ClubInput';
 import type { Contact, Request, RosterPlayer, RosterVersion, Team } from '../../lib/types';
@@ -197,7 +197,11 @@ function TeamFields({ team, requests, defaultStart, onSaved }: { team: Team; req
   const teamName = (id: string | null) => comp.teams.find((x) => x.id === id)?.name ?? '?';
   const shoes = shoesValue(team.shoes ?? '');
   const club = [team.club_name, team.club_code && `č. ${team.club_code}`].filter(Boolean).join(' · ');
-  const starts = [team.start_home && `domácí utkání ${shortTime(team.start_home)}`, team.start_away && `utkání venku ${shortTime(team.start_away)}`].filter(Boolean);
+  const skip = (s: string) => (roundsText(s) ? ` (neplatí v ${roundsText(s)})` : '');
+  const starts = [
+    team.start_home && `domácí utkání ${shortTime(team.start_home)}${skip(team.start_home_skip)}`,
+    team.start_away && `utkání venku ${shortTime(team.start_away)}${skip(team.start_away_skip)}`,
+  ].filter(Boolean);
   const none = <span className="muted">—</span>;
   const rows: { label: string; value: React.ReactNode; filled: boolean }[] = [
     { label: 'Oddíl', value: club || none, filled: !!club },

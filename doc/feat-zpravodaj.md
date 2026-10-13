@@ -48,3 +48,13 @@ Kalendář (volitelně, na nové stránce).
 - V celé aplikaci (detail družstva, náhled importu, editor soupisky) jsou tři samostatné sloupce ve stálém pořadí
   **Z | H/V/C | K/ZK** (nadpis „Z“, nad H/V/C a K/ZK společný „Označení“; sloupce mají pevnou šířku, aby se prázdné sloupce nesmrštily) (`web/src/components/FlagCells.tsx`, `flagParts` v `shared/roster/draft.ts`).
 - Ve zpravodaji (náhled, DOCX, PDF) samostatné sloupce **Z | P | K**: P = písmeno H/V/C, K = kapitán K/ZK.
+
+## Výjimky začátků a začátek posledního kola
+- Požadavek na začátek utkání: v editaci zaškrtnutí „Výjimka schválena“ (= stav vyhověno) a „Neplatí v kolech“ (`requests.skip_rounds`,
+  např. `3,7`). Schválený požadavek se propíše do družstva (`teams.start_home|away` + `_skip`).
+- Poslední kolo: výjimky nikdy; všechna utkání začínají v `competitions.last_start` (Přehled → „Začátek posledního kola“),
+  prázdné = výchozí začátek.
+- Zpravodaj (jako uvodni-zpravodaj): čas výjimky červeně u domácího družstva, v záhlaví kola „, pokud není uvedeno jinak“ jen když
+  v kole nějaká výjimka platí; ve vyloučeném kole se výjimka neuvede. Záhlaví posledního kola má čas posledního kola a poznámku
+  „poslední kolo, všechna utkání musí začínat v …“. Kapitola Specifické požadavky: řádek výjimky s „(neplatí v 3. a 7. kole)“,
+  výchozí doplňující text uvádí začátek posledního kola.

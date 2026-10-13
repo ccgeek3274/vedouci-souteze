@@ -5,7 +5,7 @@ import { applyRosterImport, previewRosterImport, type ContactRole } from '../lib
 import { TEAM_FIELDS, TEAM_NUMERIC } from './competitions';
 import { normalizeDraft } from '../../shared/roster/draft';
 import { bestTeamMatch, teamNameScore } from '../../shared/text';
-import { normTime, parseStartTime, shortTime, type StartSide } from '../../shared/startTime';
+import { normRounds, normTime, parseStartTime, shortTime, type StartSide } from '../../shared/startTime';
 import { CONSTRAINT_KINDS, type ConstraintKind } from '../../shared/draw/check';
 import type { AppEnv } from '../types';
 
@@ -235,7 +235,7 @@ teams.post('/competitions/:id/rosters/import', async (c) => {
 
 // ---- Requests for the draw meeting -----------------------------------------------------------
 
-type RequestRow = { id: number; competition_id: string; team_id: string | null; kind: string; text: string; status: string; time: string | null; side: string | null };
+type RequestRow = { id: number; competition_id: string; team_id: string | null; kind: string; text: string; status: string; time: string | null; side: string | null; skip_rounds: string };
 
 const describeStart = (time: string, side: StartSide) => `${side === 'home' ? 'domácí' : 'venkovní'} utkání v ${shortTime(time)}`;
 
@@ -251,11 +251,11 @@ function syncTeamStart(db: D1Database, before: RequestRow | null, after: Request
   const a = effective(after);
   if (b && !(a && a.side === b.side && a.time === b.time && a.team_id === b.team_id)) {
     const col = b.side === 'home' ? 'start_home' : 'start_away';
-    out.push(db.prepare(`UPDATE teams SET ${col} = NULL, updated_at = ? WHERE id = ? AND ${col} = ?`).bind(now(), b.team_id, b.time));
+    out.push(db.prepare(`UPDATE teams SET ${col} = NULL, ${col}_skip = '', updated_at = ? WHERE id = ? AND ${col} = ?`).bind(now(), b.team_id, b.time));
   }
   if (a) {
     const col = a.side === 'home' ? 'start_home' : 'start_away';
-    out.push(db.prepare(`UPDATE teams SET ${col} = ?, updated_at = ? WHERE id = ?`).bind(a.time, now(), a.team_id));
+    out.push(db.prepare(`UPDATE teams SET ${col} = ?, ${col}_skip = ?, updated_at = ? WHERE id = ?`).bind(a.time, a.skip_rounds ?? '', now(), a.team_id));
   }
   return out;
 }
@@ -263,7 +263,7 @@ function syncTeamStart(db: D1Database, before: RequestRow | null, after: Request
 teams.post('/competitions/:id/requests', async (c) => {
   const comp = await ownedCompetition(c, c.req.param('id'));
   if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
-  const body = await c.req.json<{ team_id?: string; kind?: string; text?: string; round?: number; time?: string; side?: string } & Record<string, unknown>>().catch(() => null);
+  const body = await c.req.json<{ team_id?: string; kind?: string; text?: string; round?: number; time?: string; side?: string; skip_rounds?: string } & Record<string, unknown>>().catch(() => null);
   if (!REQUEST_KINDS.includes(body?.kind ?? '')) return c.json({ error: 'Zadejte typ požadavku' }, 400);
   const draw = body!.kind === 'draw_no' ? pick(body, [...DRAW_FIELDS, 'round'] as const, ['value', 'ext_no', 'ext_teams', 'round'] as const) : {};
   const drawErr = await checkDrawFields(c, comp.id, draw);
@@ -280,16 +280,18 @@ teams.post('/competitions/:id/requests', async (c) => {
     if (!body!.team_id) return c.json({ error: 'Požadavek na začátek utkání musí mít družstvo' }, 400);
     text ||= describeStart(time, side);
   }
+  const skip = body!.kind === 'start_time' ? normRounds(body!.skip_rounds) : '';
+  if (skip === null) return c.json({ error: 'Kola zadejte čísly, např. 3, 7' }, 400);
   if (!text && body!.kind !== 'draw_no') return c.json({ error: 'Zadejte text požadavku' }, 400);
   if (body!.team_id) {
     const team = await ownedTeam(c, body!.team_id);
     if (!team || team.competition_id !== comp.id) return c.json({ error: 'Družstvo nepatří do této soutěže' }, 400);
   }
   await c.env.DB.prepare(
-    `INSERT INTO requests (competition_id, team_id, kind, text, round, time, side, draw_kind, value, other_team_id, ext_name, ext_no, ext_teams, source, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO requests (competition_id, team_id, kind, text, round, time, side, skip_rounds, draw_kind, value, other_team_id, ext_name, ext_no, ext_teams, source, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    comp.id, body!.team_id ?? null, body!.kind, text, (draw.round as number | undefined) ?? null, time, side,
+    comp.id, body!.team_id ?? null, body!.kind, text, (draw.round as number | undefined) ?? null, time, side, skip,
     draw.draw_kind ?? null, draw.value ?? null, draw.other_team_id ?? null, draw.ext_name ?? '', draw.ext_no ?? null, draw.ext_teams ?? null,
     'manual', now(),
   ).run();
@@ -306,7 +308,7 @@ teams.patch('/requests/:reqId', async (c) => {
   const before = await ownedRequest(c, c.req.param('reqId'));
   if (!before) return c.json({ error: 'Požadavek nenalezen' }, 404);
   const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null),
-    ['kind', 'text', 'round', 'status', 'decision', 'time', 'side', 'resolved', ...DRAW_FIELDS] as const, ['round', 'value', 'ext_no', 'ext_teams', 'resolved'] as const);
+    ['kind', 'text', 'round', 'status', 'decision', 'time', 'side', 'skip_rounds', 'resolved', ...DRAW_FIELDS] as const, ['round', 'value', 'ext_no', 'ext_teams', 'resolved'] as const);
   if ('resolved' in f) f.resolved = f.resolved ? 1 : 0;
   const drawErr = await checkDrawFields(c, before.competition_id, f);
   if (drawErr) return c.json({ error: drawErr }, 400);
@@ -314,6 +316,11 @@ teams.patch('/requests/:reqId', async (c) => {
   if ('kind' in f && !REQUEST_KINDS.includes(String(f.kind))) return c.json({ error: 'Neplatný typ' }, 400);
   if ('status' in f && !REQUEST_STATUSES.includes(String(f.status))) return c.json({ error: 'Neplatný stav' }, 400);
   if ('side' in f && f.side !== 'home' && f.side !== 'away') return c.json({ error: 'Neplatná strana (home/away)' }, 400);
+  if ('skip_rounds' in f) {
+    const skip = normRounds(f.skip_rounds);
+    if (skip === null) return c.json({ error: 'Kola zadejte čísly, např. 3, 7' }, 400);
+    f.skip_rounds = skip;
+  }
   if ('time' in f) {
     f.time = f.time ? normTime(f.time) : null;
     if (f.time === '') return c.json({ error: 'Čas musí mít tvar HH:MM' }, 400);

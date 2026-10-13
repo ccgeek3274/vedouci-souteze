@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import type { TeamWithSummary } from '../../lib/types';
 import { bestTeamMatch, fold } from '../../../../shared/text';
-import { shortTime } from '../../../../shared/startTime';
+import { roundsText, shortTime } from '../../../../shared/startTime';
 import { useCompetition } from './CompetitionLayout';
 
 type TableRow = { teamId: number; teamName: string };
@@ -67,8 +67,8 @@ export function Teams() {
                     <td>{captain(t)?.name ?? <span className="muted">—</span>}</td>
                     <td style={{ maxWidth: 280 }}>{t.venue || <span className="muted">—</span>}</td>
                     <td className="mono" style={{ whiteSpace: 'nowrap' }}>
-                      {t.start_home && <div>doma {shortTime(t.start_home)}</div>}
-                      {t.start_away && <div>venku {shortTime(t.start_away)}</div>}
+                      {t.start_home && <div>doma {shortTime(t.start_home)}{t.start_home_skip && <span className="muted" title={`neplatí v ${roundsText(t.start_home_skip)}`}> (mimo {t.start_home_skip})</span>}</div>}
+                      {t.start_away && <div>venku {shortTime(t.start_away)}{t.start_away_skip && <span className="muted" title={`neplatí v ${roundsText(t.start_away_skip)}`}> (mimo {t.start_away_skip})</span>}</div>}
                     </td>
                     <td className="mono">{t.draw_no ?? ''}</td>
                     <td className="actions">

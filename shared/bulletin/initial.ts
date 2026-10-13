@@ -1,7 +1,7 @@
 // Úvodní zpravodaj (M8): config of the draft, input data (chess.cz + app) and the document model shared by
 // the HTML preview, DOCX and PDF renderers. Layout and wording follow uvodni-zpravodaj and the real
 // RPB 2026/27 bulletin (doc/soupisky/rpb_26_27_uz_v3.docx).
-import { matchStart, shortTime } from '../startTime';
+import { matchStart, roundsText, shortTime, type StartTeam } from '../startTime';
 import { deltaBlocks, textDelta, type DeltaOp, type RichBlock } from './rich';
 
 export const TEXT_KEYS = ['intro', 'requirements', 'referees', 'announcements', 'results'] as const;
@@ -54,6 +54,8 @@ export type BTeam = {
   contacts: BContact[];
   startHome: string | null;
   startAway: string | null;
+  startHomeSkip?: string; // rounds where the exception does not apply ("3,7")
+  startAwaySkip?: string;
 };
 export type BPlayer = {
   pos: number; name: string; nrtg: number; irtg: number; z: boolean; letter: string; cap: string;
@@ -64,6 +66,7 @@ export type BulletinData = {
   compName: string; short: string; region: string; season: string;
   chessczId: number | null; www: string | null;
   defaultStart: string; timeControl: string;
+  lastStart?: string; // alternative start of the last round ('' = default start)
   manager: { name: string; email: string; phone: string };
   teams: BTeam[]; // in start-number order
   rosters: Record<string, BPlayer[] | null>; // by team key; null = no roster
@@ -220,8 +223,9 @@ function exceptionLines(data: BulletinData): string[] {
   const out: string[] = [];
   for (const t of data.teams) {
     const h = shortTime(t.startHome), a = shortTime(t.startAway), d = shortTime(data.defaultStart);
-    if (h && h !== d) out.push(`${t.name} — domácí utkání v ${h} hodin`);
-    if (a && a !== d) out.push(`${t.name} — utkání venku v ${a} hodin`);
+    const skip = (s?: string) => (roundsText(s) ? ` (neplatí v ${roundsText(s)})` : '');
+    if (h && h !== d) out.push(`${t.name} — domácí utkání v ${h} hodin${skip(t.startHomeSkip)}`);
+    if (a && a !== d) out.push(`${t.name} — utkání venku v ${a} hodin${skip(t.startAwaySkip)}`);
   }
   return out;
 }
@@ -233,8 +237,9 @@ export function defaultTexts(data: BulletinData): Record<TextKey, DeltaOp[]> {
   const intro = `Ve skupině ${n >= 2 && n <= 4 ? 'startují' : 'startuje'} ${n} ${teamsWord(n)}.`
     + (data.timeControl ? ` Hrací tempo je stanoveno na ${data.timeControl}.` : '');
   const lastNr = data.rounds.length ? Math.max(...data.rounds.map((r) => r.nr)) : null;
-  const requirements = exceptionLines(data).length && lastNr
-    ? [`Dle rozpisu soutěže nesmí být poslední kolo přeloženo a ani mu nesmí být změněn začátek — všechna utkání ${lastNr}. kola začínají v ${start} hodin.`]
+  const last = lastStartOf(data);
+  const requirements = (exceptionLines(data).length || last !== start) && lastNr
+    ? [`Dle rozpisu soutěže nesmí být poslední kolo přeloženo a ani mu nesmí být změněn začátek — všechna utkání ${lastNr}. kola začínají v ${last} hodin.`]
     : [];
   const allRefs = data.teams.length > 0 && data.teams.every((t) => t.contacts.some((c) => c.role === 'rozhodci' && c.name.trim()));
   const referees = ['Rozhodčí byli nominováni dle informací od družstev příp. dle databáze ŠSČR.' + (allRefs ? ' Všechna družstva mají „své domácí“ rozhodčí.' : '')];
@@ -258,9 +263,17 @@ export function defaultTexts(data: BulletinData): Record<TextKey, DeltaOp[]> {
   };
 }
 
-export function defaultLastNote(defaultStart: string) {
-  return `poslední kolo, všechna utkání musí začínat v ${shortTime(defaultStart)}`;
+/** Start of the last round ("9:00"): the competition's alternative last-round start, else the default start. */
+export function lastStartOf(data: Pick<BulletinData, 'defaultStart' | 'lastStart'>): string {
+  return shortTime(data.lastStart) || shortTime(data.defaultStart);
 }
+
+export function defaultLastNote(lastStart: string) {
+  return `poslední kolo, všechna utkání musí začínat v ${shortTime(lastStart)}`;
+}
+
+const startTeam = (t: BTeam | undefined): StartTeam | null =>
+  t ? { start_home: t.startHome, start_away: t.startAway, start_home_skip: t.startHomeSkip, start_away_skip: t.startAwaySkip } : null;
 
 export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinModel {
   const warnings = [...data.warnings];
@@ -289,9 +302,9 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
     let special = false;
     const rows = r.matches.map((m, i): RoundRow => {
       const h = team.get(m.home), a = team.get(m.away);
-      const st = matchStart(h ? { start_home: h.startHome } : null, a ? { start_away: a.startAway } : null, data.defaultStart, last);
+      const st = matchStart(startTeam(h), startTeam(a), data.defaultStart, { nr: r.nr, last, lastStart: data.lastStart });
       if (last) {
-        const raw = matchStart(h ? { start_home: h.startHome } : null, a ? { start_away: a.startAway } : null, data.defaultStart, false);
+        const raw = matchStart(startTeam(h), startTeam(a), data.defaultStart, { nr: r.nr, last: false });
         if (raw.exception) warnings.push(`V posledním kole se neuplatní jiný začátek: ${h?.name} – ${a?.name} (${raw.conflict ? CONFLICT : shortTime(raw.time)})`);
       }
       const time = st.conflict ? CONFLICT : st.exception ? shortTime(st.time) : '';
@@ -305,10 +318,10 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
         refOptions: (h?.contacts ?? []).filter((c) => c.role === 'rozhodci' && c.name.trim()).map((c) => c.name.trim()),
       };
     });
-    const note = last ? (cfg.lastNote ?? defaultLastNote(data.defaultStart)).trim() : '';
+    const note = last ? (cfg.lastNote ?? defaultLastNote(lastStartOf(data))).trim() : '';
     return {
       nr: r.nr, rows,
-      header: `Kolo ${r.nr} dne ${roundDate(r.date)} v ${start} hodin` + (special ? ', pokud není uvedeno jinak' : '') + (note ? ` (${note})` : ''),
+      header: `Kolo ${r.nr} dne ${roundDate(r.date)} v ${last ? lastStartOf(data) : start} hodin` + (special ? ', pokud není uvedeno jinak' : '') + (note ? ` (${note})` : ''),
     };
   });
   if (cfg.withRef) {
@@ -317,9 +330,12 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
   }
 
   const exceptions = exceptionLines(data);
-  const requirementLines = exceptions.length
-    ? [`Jiné začátky utkání (výchozí začátek je v ${start} hodin):`, ...exceptions.map((s) => `• ${s}`)]
-    : [`Všechna utkání začínají v ${start} hodin.`];
+  const lastStart = lastStartOf(data);
+  const requirementLines = [
+    ...(exceptions.length
+      ? [`Jiné začátky utkání (výchozí začátek je v ${start} hodin):`, ...exceptions.map((s) => `• ${s}`)]
+      : [lastStart === start ? `Všechna utkání začínají v ${start} hodin.` : `Utkání začínají v ${start} hodin.`]),
+  ];
 
   const links = [
     ...(data.chessczId ? [{ label: 'Šachový svaz', url: chessczUrl(data.chessczId) }] : []),

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
 import { REQUEST_KIND_LABEL, REQUEST_STATUS_LABEL } from '../../lib/format';
 import type { Request } from '../../lib/types';
-import { normTime, shortTime } from '../../../../shared/startTime';
+import { normRounds, normTime, roundsText, shortTime } from '../../../../shared/startTime';
 import { CONSTRAINT_LABEL, describeDraw, drawConstraints, manualResolution, tableSize, type ConditionState, type ConstraintKind } from '../../../../shared/draw/check';
 import { useCompetition } from './CompetitionLayout';
 
@@ -16,7 +16,7 @@ const STATUS_CLASS: Record<string, string> = { new: '', accepted: 'ok', rejected
 
 /** Editable fields of a request (form state: numbers as strings). */
 type Draft = {
-  team_id: string; kind: string; status: string; text: string; decision: string; time: string; side: string;
+  team_id: string; kind: string; status: string; text: string; decision: string; time: string; side: string; skip_rounds: string;
   draw_kind: string; value: string; round: string; other_team_id: string; ext_name: string; ext_no: string; ext_teams: string;
   resolved: boolean;
 };
@@ -25,13 +25,13 @@ const num = (v: string) => (v ? Number(v) : null);
 
 function toDraft(r: Request): Draft {
   return {
-    team_id: r.team_id ?? '', kind: r.kind, status: r.status, text: r.text, decision: r.decision, time: r.time ?? '', side: r.side ?? 'home',
+    team_id: r.team_id ?? '', kind: r.kind, status: r.status, text: r.text, decision: r.decision, time: r.time ?? '', side: r.side ?? 'home', skip_rounds: r.skip_rounds ?? '',
     draw_kind: r.draw_kind ?? '', value: str(r.value), round: str(r.round), other_team_id: r.other_team_id ?? '',
     ext_name: r.ext_name ?? '', ext_no: str(r.ext_no), ext_teams: str(r.ext_teams), resolved: !!r.resolved,
   };
 }
 const EMPTY: Draft = {
-  team_id: '', kind: 'draw_no', status: 'new', text: '', decision: '', time: '10:00', side: 'home',
+  team_id: '', kind: 'draw_no', status: 'new', text: '', decision: '', time: '10:00', side: 'home', skip_rounds: '',
   draw_kind: '', value: '', round: '', other_team_id: '', ext_name: '', ext_no: '', ext_teams: '', resolved: false,
 };
 
@@ -39,7 +39,7 @@ const EMPTY: Draft = {
 function toBody(d: Draft) {
   return {
     team_id: d.team_id || undefined, kind: d.kind, status: d.status, text: d.text.trim(), decision: d.decision.trim(), resolved: d.resolved ? 1 : 0,
-    ...(d.kind === 'start_time' ? { time: d.time || null, side: d.side } : {}),
+    ...(d.kind === 'start_time' ? { time: d.time || null, side: d.side, skip_rounds: d.skip_rounds } : {}),
     ...(d.kind === 'draw_no' ? {
       draw_kind: d.draw_kind || null, value: num(d.value), round: num(d.round), other_team_id: d.other_team_id || null,
       ext_name: d.ext_name.trim(), ext_no: num(d.ext_no), ext_teams: num(d.ext_teams),
@@ -55,7 +55,11 @@ export function manualState(r: Request): ConditionState | null {
 
 /** One-line description of a request. */
 export function requestSummary(r: Request, name: (id: string | null) => string): string {
-  if (r.kind === 'start_time') return r.time ? `${r.side === 'away' ? 'Utkání venku' : 'Domácí utkání'} v ${shortTime(r.time)}` : 'Začátek utkání — chybí čas';
+  if (r.kind === 'start_time') {
+    if (!r.time) return 'Začátek utkání — chybí čas';
+    const skip = roundsText(r.skip_rounds);
+    return `${r.side === 'away' ? 'Utkání venku' : 'Domácí utkání'} v ${shortTime(r.time)}${skip ? ` (neplatí v ${skip})` : ''}`;
+  }
   if (r.kind === 'draw_no') {
     const [c] = drawConstraints([{ ...r, status: 'new', team_id: r.team_id ?? '' }]);
     const s = c?.kind ? describeDraw(c, name) : 'druh neurčen';
@@ -85,7 +89,7 @@ function RequestFields({ d, set, withTeam, withStatus }: { d: Draft; set: (p: Pa
         <select className="input input-sm" value={d.kind} onChange={(e) => set({ kind: e.target.value })}>
           {Object.entries(REQUEST_KIND_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select></div>
-      {withStatus && (
+      {withStatus && d.kind !== 'start_time' && (
         <div className="field"><label>Stav</label>
           <select className="input input-sm" value={d.status} onChange={(e) => set({ status: e.target.value })}>
             {Object.entries(REQUEST_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -101,6 +105,19 @@ function RequestFields({ d, set, withTeam, withStatus }: { d: Draft; set: (p: Pa
             </select></div>
           <div className="field"><label>Začátek</label>
             <input type="time" className="input input-sm mono" value={d.time} onChange={(e) => set({ time: e.target.value })} /></div>
+          <div className="field"><label>Neplatí v kolech</label>
+            <input className="input input-sm mono" placeholder="např. 3, 7" value={d.skip_rounds} onChange={(e) => set({ skip_rounds: e.target.value })} />
+            {normRounds(d.skip_rounds) === null && <span className="tag bad">jen čísla kol</span>}</div>
+          {withStatus && (
+            <div className="field"><label>Schválení</label>
+              <label className="row" style={{ gap: 6, height: 32 }}>
+                <input type="checkbox" checked={d.status === 'accepted'} onChange={(e) => set({ status: e.target.checked ? 'accepted' : 'new' })} />
+                Výjimka schválena{d.status === 'rejected' && <span className="tag bad">zamítnuto</span>}
+              </label></div>
+          )}
+          <div className="field full"><span className="helper-text" style={{ margin: 0 }}>
+            Schválená výjimka platí ve všech kolech kromě uvedených. V posledním kole neplatí nikdy — všechna utkání začínají ve výchozí čas, případně v začátek posledního kola z údajů soutěže.
+          </span></div>
         </>
       )}
 
@@ -182,7 +199,7 @@ function RequestEdit({ r, onClose }: { r: Request; onClose: () => void }) {
       <RequestFields d={d} set={(p) => setD({ ...d, ...p })} withTeam={false} withStatus />
       <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end' }}>
         <button className="btn btn-small" onClick={onClose} disabled={busy}>Zrušit</button>
-        <button className="btn btn-small btn-primary" onClick={save} disabled={busy || (d.kind === 'start_time' && !normTime(d.time))}>Uložit</button>
+        <button className="btn btn-small btn-primary" onClick={save} disabled={busy || (d.kind === 'start_time' && (!normTime(d.time) || normRounds(d.skip_rounds) === null))}>Uložit</button>
       </div>
     </div>
   );
