@@ -5,6 +5,7 @@ import { api, apiErrorText } from '../../lib/api';
 import { czDateTime, ROLE_LABEL } from '../../lib/format';
 import { shortTime } from '../../../../shared/startTime';
 import { parseContactPaste } from '../../../../shared/contacts';
+import { ClubInput } from '../../components/ClubInput';
 import type { Contact, RosterPlayer, RosterVersion, Team } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 import { IssueList, useRosterCheck } from './RosterCheck';
@@ -210,7 +211,9 @@ function TeamFields({ team, onSaved }: { team: Team; onSaved: () => Promise<void
             {TEXT_FIELDS.map((f) => (
               <div className="field" key={f.key} style={f.wide ? { gridColumn: 'span 2' } : undefined}>
                 <label>{f.label}</label>
-                <input className="input" value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+                {f.key === 'club_name'
+                  ? <ClubInput name={form.club_name ?? ''} code={form.club_code ?? ''} onChange={(p) => setForm((x) => ({ ...x, ...p }))} />
+                  : <input className="input" value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />}
               </div>
             ))}
             <div className="field"><label>Losovací číslo</label>

@@ -6,6 +6,10 @@ import { NewRequestForm, RequestTable } from './RequestItems';
 // Draw-meeting requests (start times, draw conditions, date changes …) — the basis of the meeting (M7).
 // An accepted start-time request becomes the team's start exception (as in uvodni-zpravodaj);
 // a draw request carries a structured condition checked on the Losování tab.
+const KIND_TITLE: Record<string, string> = {
+  start_time: 'Požadavky na začátek utkání', draw_no: 'Požadavky na losování', date_change: 'Změny termínů', other: 'Jiné požadavky',
+};
+
 export function Requests() {
   const { data } = useCompetition();
   const c = data.competition;
@@ -28,19 +32,20 @@ export function Requests() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-strip"><h2>Požadavky pro losovací schůzi</h2>
-          <span className="helper">Z e-soupisek se přenesou automaticky; požadavky z e-mailů doplňte ručně.</span></div>
-        <div className="card-body table-scroll">
-          {!data.requests.length && <p className="muted">Zatím žádné požadavky.</p>}
-          {byKind.map(([kind, list]) => (
-            <div key={kind}>
-              <div className="section-title">{REQUEST_KIND_LABEL[kind]}</div>
-              <RequestTable requests={list} showKind={false} />
-            </div>
-          ))}
+      {!data.requests.length && (
+        <div className="card"><div className="card-strip"><h2>Požadavky pro losovací schůzi</h2></div>
+          <div className="card-body muted">Zatím žádné požadavky. Z e-soupisek se přenesou automaticky; požadavky z e-mailů doplňte ručně.</div></div>
+      )}
+      {byKind.map(([kind, list]) => (
+        <div className="card" key={kind}>
+          <div className="card-strip"><h2>{KIND_TITLE[kind] ?? REQUEST_KIND_LABEL[kind]}</h2>
+            <span className="badge" title="počet">{list.length}</span>
+            {list.some((r) => r.status === 'new') && <span className="helper">{list.filter((r) => r.status === 'new').length} nových</span>}</div>
+          <div className="card-body table-scroll" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            <RequestTable requests={list} showKind={false} />
+          </div>
         </div>
-      </div>
+      ))}
 
       <div className="card">
         <div className="card-strip"><h2>Nový požadavek</h2></div>
