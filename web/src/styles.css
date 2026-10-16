@@ -199,6 +199,66 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
   .page-title, .page-sub { color: #000; }
 }
 
+.skin-select { height: 28px; padding: 0 6px; background: transparent; color: var(--subtitle); border: 1px solid oklch(0.40 0.01 60);
+  border-radius: var(--radius); font: 600 11.5px var(--mono); cursor: pointer; }
+.skin-select option { color: #000; background: #fff; }
+
+/* Skin "chess.cz" — look of the competition pages on www.chess.cz (Roboto Condensed, blue table heads, red titles).
+   Overrides tokens first, then the few rules whose dark-screen colours do not map onto a white page.
+   The bulletin preview (.doc) keeps its own document styling. */
+:root[data-skin="chess"] {
+  --brand: #084b80; --brand-dk: #064271; --red: #be1221;
+  --ink: #333; --paper: #fff; --header: #084b80; --screen: #fff; --field-bg: #fff; --field-bd: #bbb;
+  --divider: #ccc; --muted: #6b6b6b; --muted-2: #777; --highlight: #f2f2f2; --cream: #fff; --subtitle: #5d5d5d;
+  --chip-idle-bg: #fff; --chip-idle-fg: #555; --chip-idle-bd: #ccc;
+  --danger: #be1221; --danger-bg: #fbeaec; --ok: #2f7d32;
+  --mono: 'Roboto Condensed', Arial, Verdana, sans-serif; --sans: 'Roboto Condensed', Arial, Verdana, sans-serif;
+}
+[data-skin="chess"] body { font: 400 15.5px/1.4 var(--sans); }
+[data-skin="chess"] .app-header { border-bottom: 1px solid #ccc; padding-bottom: 14px; }
+[data-skin="chess"] .checker { background: linear-gradient(90deg, var(--brand) 0 50%, var(--red) 50% 100%); height: 5px; }
+[data-skin="chess"] .app-title { color: var(--red); font: 500 34px/1.1 var(--sans); letter-spacing: 0; text-transform: none; }
+[data-skin="chess"] .app-nav { font: 400 15px var(--sans); text-transform: none; letter-spacing: 0; color: #777; }
+[data-skin="chess"] .app-nav a.active, [data-skin="chess"] .app-nav a:hover { color: var(--brand); }
+[data-skin="chess"] .skin-select { border-color: #ccc; color: #555; font: 400 14px var(--sans); }
+[data-skin="chess"] .page-title { color: var(--red); font: 500 32px/1.15 var(--sans); letter-spacing: 0; text-transform: none; }
+[data-skin="chess"] .comp-header { border-bottom: 1px solid #ccc; margin-bottom: 14px; }
+[data-skin="chess"] .crumbs a:hover { color: var(--brand); }
+
+[data-skin="chess"] .card { border-color: #ccc; }
+[data-skin="chess"] .card-strip { color: #fff; border-bottom-color: var(--brand-dk); padding-top: 10px; padding-bottom: 10px; }
+[data-skin="chess"] .card-strip h2 { font: 500 18px var(--sans); letter-spacing: 0; text-transform: none; }
+[data-skin="chess"] .card-strip .helper, [data-skin="chess"] .card-strip .muted { color: rgba(255, 255, 255, 0.82); }
+[data-skin="chess"] .card-strip .badge { background: #fff; color: var(--brand); }
+[data-skin="chess"] .card-strip .btn { border-color: #fff; }
+[data-skin="chess"] .card-strip .tag { background: #fff; }
+
+[data-skin="chess"] .btn { font: 500 14.5px var(--sans); letter-spacing: 0; border-color: var(--brand); color: var(--brand); }
+[data-skin="chess"] .btn-primary { background: var(--brand); color: #fff; }
+[data-skin="chess"] .btn-primary:hover { background: var(--brand-dk); }
+[data-skin="chess"] .btn-danger { color: var(--danger); border-color: var(--danger); }
+[data-skin="chess"] .btn-small { font-size: 13.5px; }
+[data-skin="chess"] .badge, [data-skin="chess"] .tag.ink, [data-skin="chess"] .chip.active,
+[data-skin="chess"] .segmented button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+[data-skin="chess"] .input:focus { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+[data-skin="chess"] .note { border-left-color: var(--brand); }
+
+[data-skin="chess"] .table th { background: var(--brand); color: #fff; font: 400 14.5px var(--sans); letter-spacing: 0; text-transform: none; border-bottom: none; padding: 7px 10px; }
+[data-skin="chess"] .table td { border-bottom: 1px solid #ccc; padding: 7px 10px; }
+[data-skin="chess"] .table tbody tr:nth-child(odd) td { background: #f2f2f2; }
+[data-skin="chess"] .table .num { font-variant-numeric: tabular-nums; }
+[data-skin="chess"] .pattern td.h { background: #d6e3ef !important; }
+
+[data-skin="chess"] .tabs { border-bottom: 2px solid var(--brand); gap: 4px; }
+[data-skin="chess"] .tabs a { font: 500 15px var(--sans); letter-spacing: 0; text-transform: none; color: var(--brand); padding: 7px 14px; }
+[data-skin="chess"] .tabs a:hover { background: #f2f2f2; color: var(--brand-dk); }
+[data-skin="chess"] .tabs a.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+[data-skin="chess"] .section-title { color: var(--red); font: 500 19px var(--sans); letter-spacing: 0; text-transform: none; }
+[data-skin="chess"] .field > label, [data-skin="chess"] .eyebrow, [data-skin="chess"] .dl dt, [data-skin="chess"] .req-kind {
+  font-weight: 500; font-size: 12.5px; letter-spacing: 0.03em; }
+[data-skin="chess"] .tag { font: 700 11px var(--sans); letter-spacing: 0.02em; }
+[data-skin="chess"] .chip { font: 700 12px var(--sans); }
+
 /* Úvodní zpravodaj (M8): toolbar, sources and the document preview (DXA/15 px, like uvodni-zpravodaj) */
 @font-face { font-family: DocFont; src: local('Calibri'), local('Carlito'), url(/fonts/Carlito-Regular.ttf) format('truetype'); }
 @font-face { font-family: DocFont; font-weight: bold; src: local('Calibri Bold'), local('Carlito Bold'), url(/fonts/Carlito-Bold.ttf) format('truetype'); }
