@@ -226,12 +226,9 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
 [data-skin="chess"] .crumbs a:hover { color: var(--brand); }
 
 [data-skin="chess"] .card { border-color: #ccc; }
-[data-skin="chess"] .card-strip { color: #fff; border-bottom-color: var(--brand-dk); padding-top: 10px; padding-bottom: 10px; }
-[data-skin="chess"] .card-strip h2 { font: 500 18px var(--sans); letter-spacing: 0; text-transform: none; }
-[data-skin="chess"] .card-strip .helper, [data-skin="chess"] .card-strip .muted { color: rgba(255, 255, 255, 0.82); }
-[data-skin="chess"] .card-strip .badge { background: #fff; color: var(--brand); }
-[data-skin="chess"] .card-strip .btn { border-color: #fff; }
-[data-skin="chess"] .card-strip .tag { background: #fff; }
+[data-skin="chess"] .card-strip { background: #fff; border-bottom: 1px solid #ccc; padding-top: 12px; padding-bottom: 10px; }
+[data-skin="chess"] .card-strip h2 { color: var(--red); font: 500 22px/1.15 var(--sans); letter-spacing: 0; text-transform: none; }
+[data-skin="chess"] .card-strip .helper { color: var(--muted); }
 
 [data-skin="chess"] .btn { font: 500 14.5px var(--sans); letter-spacing: 0; border-color: var(--brand); color: var(--brand); }
 [data-skin="chess"] .btn-primary { background: var(--brand); color: #fff; }
@@ -253,7 +250,7 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
 [data-skin="chess"] .tabs a { font: 500 15px var(--sans); letter-spacing: 0; text-transform: none; color: var(--brand); padding: 7px 14px; }
 [data-skin="chess"] .tabs a:hover { background: #f2f2f2; color: var(--brand-dk); }
 [data-skin="chess"] .tabs a.active { background: var(--brand); color: #fff; border-color: var(--brand); }
-[data-skin="chess"] .section-title { color: var(--red); font: 500 19px var(--sans); letter-spacing: 0; text-transform: none; }
+[data-skin="chess"] .section-title { color: var(--brand); font: 500 18px var(--sans); letter-spacing: 0; text-transform: none; }
 [data-skin="chess"] .field > label, [data-skin="chess"] .eyebrow, [data-skin="chess"] .dl dt, [data-skin="chess"] .req-kind {
   font-weight: 500; font-size: 12.5px; letter-spacing: 0.03em; }
 [data-skin="chess"] .tag { font: 700 11px var(--sans); letter-spacing: 0.02em; }
