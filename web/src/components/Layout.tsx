@@ -1,13 +1,14 @@
 import { Link, NavLink, Outlet, useMatch } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { SKINS, getSkin, setSkin, type SkinId } from '../lib/skin';
+import { SKINS, getSkin, setSkin, type SkinId, type SkinScope } from '../lib/skin';
 
-function SkinSelect() {
-  const [skin, set] = useState(getSkin);
+export function SkinSelect({ scope = 'app' }: { scope?: SkinScope }) {
+  const [skin, set] = useState(() => getSkin(scope));
+  const label = scope === 'public' ? 'Vzhled stránky' : 'Vzhled aplikace';
   return (
-    <select className="skin-select" title="Vzhled aplikace" aria-label="Vzhled aplikace" value={skin}
-      onChange={(e) => { const v = e.target.value as SkinId; setSkin(v); set(v); }}>
+    <select className="skin-select" title={label} aria-label={label} value={skin}
+      onChange={(e) => { const v = e.target.value as SkinId; setSkin(v, scope); set(v); }}>
       {SKINS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
     </select>
   );

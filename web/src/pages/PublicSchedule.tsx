@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api, apiErrorText, ApiError } from '../lib/api';
 import { CONFLICT, roundDate } from '../../../shared/bulletin/initial';
 import type { PublicSchedule as Data } from '../../../shared/publicSchedule';
+import { SkinSelect } from '../components/Layout';
+import { applySkin, getSkin } from '../lib/skin';
 
 // Public schedule (no login), modelled on chess.cz: /rozpis/:id = all rounds with starts and referees,
 // /rozpis/:id/druzstvo/:teamKey = one team's matches, captain and venue (no roster).
@@ -12,6 +14,12 @@ export function PublicSchedule() {
   const q = useQuery({ queryKey: ['public', id], queryFn: () => api.get<Data>(`/public/competitions/${id}`), retry: false });
   const d = q.data;
   const team = d && teamKey ? d.teams.find((t) => t.key === teamKey) : undefined;
+
+  // The public page has its own skin (default chess.cz); the app's skin is restored when leaving it.
+  useEffect(() => {
+    applySkin(getSkin('public'));
+    return () => applySkin(getSkin('app'));
+  }, []);
 
   useEffect(() => {
     if (d) document.title = `${team ? `${team.name} – ` : ''}${d.competition.name} – rozpis`;
@@ -37,6 +45,7 @@ export function PublicSchedule() {
           <p className="page-sub">{[c.region, `ročník ${c.season}`].filter(Boolean).join(' · ')}</p>
         </div>
         <nav className="public-links">
+          <SkinSelect scope="public" />
           {c.chessczUrl && <a href={c.chessczUrl} target="_blank" rel="noreferrer">Soutěž na chess.cz</a>}
           {c.chessResultsUrl && <a href={c.chessResultsUrl} target="_blank" rel="noreferrer">chess-results</a>}
         </nav>
