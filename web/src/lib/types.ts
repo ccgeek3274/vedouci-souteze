@@ -3,7 +3,7 @@ import type { CzCheck, VCheck } from '../../../shared/roster/verify';
 export type Competition = {
   id: string; season: string; region: string; level: string; group_code: string; short: string; name: string;
   boards: number; default_start: string; last_start: string; time_control: string; manager_name: string; manager_email: string;
-  manager_phone: string; mutual_deadline: string | null; chesscz_comp_id: number | null; phase: string; notes: string;
+  manager_phone: string; mutual_deadline: string | null; chesscz_comp_id: number | null; phase: string; notes: string; published: number;
   updated_at: number;
 };
 export type CompetitionListItem = Pick<Competition, 'id' | 'season' | 'short' | 'name' | 'level' | 'phase' | 'boards' | 'chesscz_comp_id' | 'updated_at'> & {

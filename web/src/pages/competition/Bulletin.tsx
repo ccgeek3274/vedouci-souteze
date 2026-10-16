@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
 import { czDateTime } from '../../lib/format';
 import type { RosterCheckData } from '../../lib/types';
@@ -15,9 +16,9 @@ import { pairs } from '../../bulletin/layout';
 
 type Stored = { config: unknown; updated_at: number | null; savepoints: { id: number; label: string; created_at: number }[] };
 
-// Úvodní zpravodaj (M8): rosters and the schedule from chess.cz, venues / contacts / referees / start-time
-// exceptions from the app. Only the draft config is stored (autosave + named save points); DOCX / PDF are
-// generated in the browser on download.
+// Úvodní zpravodaj (M8): rosters and the schedule from chess.cz, venues / contacts / start-time exceptions from
+// the app, referees from the referee assignment page (read-only here). Only the draft config is stored (autosave +
+// named save points); DOCX / PDF are generated in the browser on download.
 export function Bulletin() {
   const { data: detail } = useCompetition();
   const c = detail.competition;
@@ -28,6 +29,7 @@ export function Bulletin() {
 
   const stored = useQuery({ queryKey: ['bulletin', c.id, 'initial'], queryFn: () => api.get<Stored>(`/competitions/${c.id}/bulletins/initial`) });
   const check = useQuery({ queryKey: ['roster-check', c.id], queryFn: () => api.get<RosterCheckData>(`/competitions/${c.id}/roster-check`) });
+  const refsQ = useQuery({ queryKey: ['referees', c.id], queryFn: () => api.get<{ assignments: Record<string, string> }>(`/competitions/${c.id}/referees`) });
   const cz = useQuery({
     queryKey: ['bulletin-cz', c.id, c.chesscz_comp_id],
     queryFn: () => loadChesscz(c.chesscz_comp_id, setProgress),
@@ -71,8 +73,8 @@ export function Bulletin() {
   useEffect(() => () => { if (pending.current) void save(); }, []); // flush on leaving the page
 
   const assembled = useMemo(
-    () => (cfg && cz.data ? assemble(detail, check.data, cz.data, cfg) : null),
-    [cfg, cz.data, detail, check.data],
+    () => (cfg && cz.data && refsQ.data ? assemble(detail, check.data, cz.data, cfg, refsQ.data.assignments) : null),
+    [cfg, cz.data, detail, check.data, refsQ.data],
   );
   const model = useMemo(() => (assembled && cfg ? buildModel(assembled.data, cfg) : null), [assembled, cfg]);
 
@@ -193,7 +195,7 @@ export function Bulletin() {
                     </>
                   )}
                 </li>
-                <li><span className="tag">aplikace</span> Hrací místnosti, kontakty, rozhodčí, schválené začátky utkání</li>
+                <li><span className="tag">aplikace</span> Hrací místnosti, kontakty, schválené začátky utkání; rozhodčí z karty <Link to="../rozhodci">Nasazení rozhodčích</Link></li>
               </ul>
             )}
             {model && model.warnings.length > 0 && (
@@ -207,7 +209,7 @@ export function Bulletin() {
             <button className="btn btn-small" onClick={savepoint}>Uložit save point</button>
           </div>
           <div className="card-body">
-            <p className="helper-text">Ukládá se jen koncept: texty, rozhodčí u zápasů, datum a volby. Soupisky a rozlosování se vždy načtou aktuální z chess.cz, místnosti a kontakty z družstev.</p>
+            <p className="helper-text">Ukládá se jen koncept: texty, datum a volby. Rozhodčí jsou z karty Nasazení rozhodčích. Soupisky a rozlosování se vždy načtou aktuální z chess.cz, místnosti a kontakty z družstev.</p>
             {stored.data?.savepoints.length ? (
               <table className="table">
                 <tbody>
@@ -320,12 +322,6 @@ function SectionView({ s, cfg, update, version }: {
     case 'rounds':
       return (
         <>
-          {s.withRef && Object.keys(cfg.refs).length > 0 && (
-            <div className="d-note">
-              Ručně změnění rozhodčí: {Object.keys(cfg.refs).length}{' '}
-              <button className="btn btn-small" onClick={() => update((x) => ({ ...x, refs: {} }))}>Vrátit rotaci</button>
-            </div>
-          )}
           {s.rounds.map((r) => {
             return (
               <table key={r.nr} className="d-tbl d-round"><tbody>
@@ -338,13 +334,7 @@ function SectionView({ s, cfg, update, version }: {
                     <td className="c">{m.board}</td><td className="c">{m.homeStc}</td>
                     <td>{m.homeName}{m.time && <span className="tm"> {m.time}{m.time === CONFLICT ? '' : ' hodin'}</span>}</td>
                     <td className="c">-</td><td>{m.awayName}</td><td className="c">{m.awayStc}</td>
-                    {s.withRef && (
-                      <td className="ref">
-                        <input className={`d-ref${m.refKey in cfg.refs ? ' changed' : ''}`} list={`refs-${m.refKey}`} value={m.ref}
-                          onChange={(e) => { const v = e.target.value; update((x) => ({ ...x, refs: { ...x.refs, [m.refKey]: v } })); }} />
-                        <datalist id={`refs-${m.refKey}`}>{m.refOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                      </td>
-                    )}
+                    {s.withRef && <td title="Rozhodčí se mění na kartě Nasazení rozhodčích">{m.ref || <span className="d-missing">nenasazen</span>}</td>}
                   </tr>
                 ))}
               </tbody></table>

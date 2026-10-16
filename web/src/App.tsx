@@ -16,11 +16,15 @@ import { TeamDetail } from './pages/competition/TeamDetail';
 import { RosterCheck } from './pages/competition/RosterCheck';
 import { Draw } from './pages/competition/Draw';
 import { Bulletin } from './pages/competition/Bulletin';
+import { Referees } from './pages/competition/Referees';
+import { PublicSchedule } from './pages/PublicSchedule';
 
 export function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/rozpis/:id" element={<PublicSchedule />} />
+      <Route path="/rozpis/:id/druzstvo/:teamKey" element={<PublicSchedule />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
@@ -32,6 +36,7 @@ export function App() {
             <Route path="kontrola" element={<RosterCheck />} />
             <Route path="pozadavky" element={<Requests />} />
             <Route path="losovani" element={<Draw />} />
+            <Route path="rozhodci" element={<Referees />} />
             <Route path="zpravodaj" element={<Bulletin />} />
             <Route path="t/:teamId" element={<TeamDetail />} />
           </Route>

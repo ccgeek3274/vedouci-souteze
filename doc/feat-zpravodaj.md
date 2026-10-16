@@ -10,10 +10,9 @@ zpravodaje RPB 2026/27 (`doc/rpb_26_27_uz_v3.docx`) a o PDF (pdfmake + Carlito j
 - Aplikace doplní: hrací místnosti, kontakty (adresář), rozhodčí, schválené výjimky začátků (`start_home/away`).
   Do místnosti se nepíše začátek utkání — jiné začátky jsou v rozlosování (červeně u domácích) a v kapitole
   Specifické požadavky.
-- **Rozhodčí u zápasů: rotace** — domácí zápasy družstva se po kolech střídavě přidělují jeho rozhodčím
-  (kontakty role rozhodčí v pořadí). Každý zápas lze ručně přepsat (pole s našeptáváním rozhodčích domácích);
-  ruční volby jsou v konceptu (`refs`, klíč `kolo:družstvo`), tlačítko *Vrátit rotaci* je smaže.
-- **Ukládá se jen koncept** (tabulka `bulletins`, `key = 'initial'`): druh, datum vydání, texty, ruční rozhodčí,
+- **Rozhodčí u zápasů** se přebírají z karty *Nasazení rozhodčích* (`doc/feat-rozhodci.md`), ve zpravodaji se už
+  nemění. Starší koncepty s polem `refs` se ignorují.
+- **Ukládá se jen koncept** (tabulka `bulletins`, `key = 'initial'`): druh, datum vydání, texty,
   volby. Vygenerované DOCX/PDF se neukládají. **Save pointy** (`bulletin_savepoints`) = pojmenované kopie
   konceptu; obnovení nejdřív uloží současný stav jako save point „před obnovením“. Místnosti a kontakty se
   neukládají do save pointů — čtou se vždy živě z družstev.

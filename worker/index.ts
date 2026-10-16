@@ -9,6 +9,8 @@ import { tokens } from './routes/tokens';
 import { registry } from './routes/registry';
 import { draw } from './routes/draw';
 import { bulletins } from './routes/bulletins';
+import { referees } from './routes/referees';
+import { publicApi } from './routes/public';
 import type { AppEnv } from './types';
 
 // Only /api/* reaches the Worker (assets.run_worker_first); everything else is the SPA.
@@ -22,9 +24,12 @@ app.route('/competitions', competitions);
 app.route('/import', imports);
 app.route('/tokens', tokens);
 app.route('/registry', registry);
+// Before the '/' routes: their authRequired middleware ('*') would also match /public/*.
+app.route('/public', publicApi);
 app.route('/', teams);
 app.route('/', draw);
 app.route('/', bulletins);
+app.route('/', referees);
 
 app.notFound((c) => c.json({ error: 'Nenalezeno' }, 404));
 app.onError((err, c) => {

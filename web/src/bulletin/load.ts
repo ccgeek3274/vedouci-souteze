@@ -3,11 +3,11 @@
 // schedule (draw numbers → Berger) are used only where chess.cz has nothing and the vedoucí confirmed it.
 import { chessczGet, competitionIssues } from '../lib/rosterCheck';
 import type { CompetitionDetail, RosterCheckData } from '../lib/types';
-import { bestTeamMatch } from '../../../shared/text';
+import { competitionSchedule } from '../../../shared/schedule';
 import { sameClubGroups } from '../../../shared/draw/check';
 import { strikeReason } from '../../../shared/roster/verify';
-import { appRoster, appSchedule, czRoster, czStartNumbers, parseCzSchedule, parseCzTable, type CzRound, type CzTeam } from '../../../shared/bulletin/source';
-import type { BPlayer, BRound, BTeam, BulletinData, InitialConfig } from '../../../shared/bulletin/initial';
+import { appRoster, czRoster, parseCzSchedule, parseCzTable, type CzRound, type CzTeam } from '../../../shared/bulletin/source';
+import type { BPlayer, BTeam, BulletinData, InitialConfig } from '../../../shared/bulletin/initial';
 
 export type CzSources = {
   details: { compName?: string; regionName?: string; compWww?: string } | null;
@@ -17,7 +17,7 @@ export type CzSources = {
 };
 
 /** chess.cz data of the competition (sequential calls; the proxy spaces and caches them). */
-export async function loadChesscz(compId: number | null, onProgress: (t: string) => void = () => {}): Promise<CzSources> {
+export async function loadChesscz(compId: number | null, onProgress: (t: string) => void = () => {}, withRosters = true): Promise<CzSources> {
   const out: CzSources = { details: null, teams: [], rounds: [], rosters: new Map() };
   if (!compId) return out;
   onProgress('soutěž');
@@ -26,7 +26,7 @@ export async function loadChesscz(compId: number | null, onProgress: (t: string)
   out.teams = parseCzTable(await chessczGet(`/competitions/${compId}/table`));
   onProgress('rozlosování');
   out.rounds = parseCzSchedule(await chessczGet(`/competitions/${compId}/schedule`));
-  for (const [i, t] of out.teams.entries()) {
+  if (withRosters) for (const [i, t] of out.teams.entries()) {
     onProgress(`soupiska ${i + 1}/${out.teams.length}`);
     out.rosters.set(t.id, await chessczGet(`/competitions/${compId}/team/${t.id}/roster`));
   }
@@ -39,52 +39,25 @@ export type Availability = {
   missingCzRosters: string[];
 };
 
-export function assemble(detail: CompetitionDetail, check: RosterCheckData | undefined, cz: CzSources, cfg: InitialConfig):
+export function assemble(detail: CompetitionDetail, check: RosterCheckData | undefined, cz: CzSources, cfg: InitialConfig, refs: Record<string, string>):
   { data: BulletinData; availability: Availability } {
   const c = detail.competition;
   const warnings: string[] = [];
   const active = detail.teams.filter((t) => t.status === 'active');
   const checkTeam = new Map((check?.teams ?? []).map((t) => [t.id, t]));
 
-  // Pair chess.cz teams with the app's (team id, else unique best name match).
-  const appOf = new Map<number, (typeof active)[number]>();
-  for (const t of cz.teams) {
-    const a = active.find((x) => x.chesscz_team_id === t.id) ?? bestTeamMatch(t.name, active.filter((x) => !x.chesscz_team_id), (x) => x.name);
-    if (a) appOf.set(t.id, a);
-    else warnings.push(`Družstvo ${t.name} z chess.cz není v aplikaci — chybí místnost, kontakty a rozhodčí`);
-  }
-  const keyOfCz = (id: number) => appOf.get(id)?.id ?? `cz:${id}`;
-
-  const toTeam = (a: (typeof active)[number] | undefined, key: string, name: string, stc: number | null): BTeam => ({
-    key, stc, name,
-    venue: a?.venue ?? '',
-    contacts: (a?.contacts ?? []).map((x) => ({ role: x.role, name: x.name, phone: x.phone, email: x.email })),
-    startHome: a?.start_home ?? null,
-    startAway: a?.start_away ?? null,
-    startHomeSkip: a?.start_home_skip ?? '',
-    startAwaySkip: a?.start_away_skip ?? '',
-  });
-
-  let teams: BTeam[];
-  if (cz.teams.length) {
-    const appNumbers = new Map(cz.teams.filter((t) => appOf.get(t.id)?.draw_no != null).map((t) => [t.id, appOf.get(t.id)!.draw_no!]));
-    const { stc, source } = czStartNumbers(cz.teams, cz.rounds, appNumbers);
-    if (!source) warnings.push('Startovní čísla nelze z chess.cz ověřit (1. kolo neodpovídá Bergerovým tabulkám) — použito pořadí podle ID družstev');
-    for (const t of cz.teams) {
-      const a = appOf.get(t.id);
-      if (a?.draw_no != null && stc.get(t.id) !== a.draw_no) warnings.push(`${t.name}: startovní číslo na chess.cz (${stc.get(t.id)}) se liší od losovacího čísla v aplikaci (${a.draw_no})`);
-    }
-    teams = cz.teams.map((t) => toTeam(appOf.get(t.id), keyOfCz(t.id), t.name, stc.get(t.id) ?? null)).sort((a, b) => (a.stc ?? 99) - (b.stc ?? 99));
-  } else {
-    teams = [...active].sort((a, b) => (a.draw_no ?? 99) - (b.draw_no ?? 99) || a.position - b.position).map((a) => toTeam(a, a.id, a.name, a.draw_no));
-  }
-
-  // Schedule.
-  const roundDates = new Map(detail.rounds.map((r) => [r.round, r.date]));
-  const appRounds = appSchedule(active, roundDates);
-  let rounds: BRound[] = [];
-  if (cz.rounds.length) rounds = cz.rounds.map((r) => ({ nr: r.nr, date: r.date, matches: r.matches.map((m) => ({ home: keyOfCz(m.home), away: keyOfCz(m.away) })) }));
-  else if (cfg.appData.schedule && appRounds) rounds = appRounds;
+  const sched = competitionSchedule(active, cz, new Map(detail.rounds.map((r) => [r.round, r.date])), cfg.appData.schedule);
+  warnings.push(...sched.warnings);
+  const teams: BTeam[] = sched.teams.map((t) => ({
+    key: t.key, stc: t.stc, name: t.name,
+    venue: t.app?.venue ?? '',
+    contacts: (t.app?.contacts ?? []).map((x) => ({ role: x.role, name: x.name, phone: x.phone, email: x.email })),
+    startHome: t.app?.start_home ?? null,
+    startAway: t.app?.start_away ?? null,
+    startHomeSkip: t.app?.start_home_skip ?? '',
+    startAwaySkip: t.app?.start_away_skip ?? '',
+  }));
+  const rounds = sched.rounds;
 
   // Rosters.
   const appPlayers = (teamId: string | undefined) => (teamId ? checkTeam.get(teamId)?.players ?? null : null);
@@ -93,7 +66,7 @@ export function assemble(detail: CompetitionDetail, check: RosterCheckData | und
   let appRosters = 0;
   const missingCzRosters: string[] = [];
   for (const t of teams) {
-    const czId = cz.teams.find((x) => keyOfCz(x.id) === t.key)?.id;
+    const czId = sched.teams.find((x) => x.key === t.key)?.czId;
     const raw = czId != null ? cz.rosters.get(czId) : null;
     const app = appPlayers(t.key.startsWith('cz:') ? undefined : t.key);
     if (app?.length) appRosters++;
@@ -145,13 +118,14 @@ export function assemble(detail: CompetitionDetail, check: RosterCheckData | und
       teams,
       rosters,
       rounds,
+      refs,
       deficiencies,
       sameClub: sameClub.filter(([a, b]) => inBulletin.has(a) && inBulletin.has(b)),
       warnings,
     },
     availability: {
       czTeams: cz.teams.length > 0, czSchedule: cz.rounds.length > 0, czRosters,
-      appSchedule: !!appRounds, appRosters, missingCzRosters,
+      appSchedule: sched.appAvailable, appRosters, missingCzRosters,
     },
   };
 }

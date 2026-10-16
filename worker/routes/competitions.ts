@@ -10,9 +10,9 @@ competitions.use('*', authRequired);
 
 const EDITABLE = [
   'season', 'region', 'level', 'group_code', 'short', 'name', 'boards', 'default_start', 'last_start', 'time_control',
-  'manager_name', 'manager_email', 'manager_phone', 'mutual_deadline', 'chesscz_comp_id', 'phase', 'notes',
+  'manager_name', 'manager_email', 'manager_phone', 'mutual_deadline', 'chesscz_comp_id', 'phase', 'notes', 'published',
 ] as const;
-const NUMERIC = ['boards', 'chesscz_comp_id'] as const;
+const NUMERIC = ['boards', 'chesscz_comp_id', 'published'] as const;
 const PHASES = ['preparation', 'draw', 'running', 'finished'];
 const TEAM_FIELDS = ['name', 'club_name', 'club_code', 'chesscz_team_id', 'draw_no', 'status', 'venue', 'shoes', 'start_pref', 'start_home', 'start_away', 'draw_requests', 'notes'] as const;
 const TEAM_NUMERIC = ['chesscz_team_id', 'draw_no'] as const;
@@ -26,6 +26,7 @@ function validate(f: Record<string, unknown>): string | null {
   if ('default_start' in f && !/^\d{1,2}:\d{2}$/.test(String(f.default_start))) return 'Začátek musí mít tvar HH:MM';
   if ('last_start' in f && f.last_start && !/^\d{1,2}:\d{2}$/.test(String(f.last_start))) return 'Začátek posledního kola musí mít tvar HH:MM (nebo prázdný)';
   if ('mutual_deadline' in f && f.mutual_deadline && !/^\d{4}-\d{2}-\d{2}$/.test(String(f.mutual_deadline))) return 'Neplatné datum';
+  if ('published' in f && f.published !== 0 && f.published !== 1) return 'Zveřejnění musí být 0 nebo 1';
   if ('phase' in f && !PHASES.includes(String(f.phase))) return 'Neplatná fáze';
   return null;
 }

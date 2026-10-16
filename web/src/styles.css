@@ -261,6 +261,33 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
 [data-skin="chess"] .tag { font: 700 11px var(--sans); letter-spacing: 0.02em; }
 [data-skin="chess"] .chip { font: 700 12px var(--sans); }
 
+/* Nasazení rozhodčích + veřejný rozpis */
+.ref-rounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 18px; }
+.ref-table td { padding: 5px 8px; }
+.ref-cell { width: 42%; }
+.ref-cell .input { width: 100%; }
+.ref-time { color: var(--danger); font-weight: 700; white-space: nowrap; }
+.ref-foreign, .input.ref-foreign { color: var(--danger); font-weight: 700; }
+.public .page-title a, .public-links a { color: inherit; }
+.public-links { display: flex; gap: 14px; flex-wrap: wrap; padding-top: 6px; }
+.public-links a { color: var(--cream); text-decoration: underline; }
+.pub-table { margin-bottom: 0; }
+.pub-table + .pub-table { margin-top: 14px; }
+.pub-table td:first-child, .pub-table th:first-child { width: 80px; white-space: nowrap; }
+.pub-round { table-layout: fixed; }
+.pub-round td:nth-child(3) { text-align: center; padding-left: 0; padding-right: 0; }
+.pub-c-time { width: 80px; } .pub-c-dash { width: 24px; } .pub-c-ref { width: 24%; }
+.pub-exc { color: var(--danger); font-weight: 700; }
+.pub-contacts .pub-label { width: 180px; }
+.public-teams { display: flex; flex-wrap: wrap; gap: 6px; }
+.public-teams .chip { text-decoration: none; height: auto; padding: 3px 8px; }
+[data-skin="chess"] .public-links a { color: var(--brand); }
+@media (max-width: 640px) {
+  .ref-rounds { grid-template-columns: 1fr; }
+  .pub-c-time { width: 52px; } .pub-c-ref { width: 28%; }
+  .pub-table td, .pub-table th { padding: 6px 5px; }
+}
+
 /* Úvodní zpravodaj (M8): toolbar, sources and the document preview (DXA/15 px, like uvodni-zpravodaj) */
 @font-face { font-family: DocFont; src: local('Calibri'), local('Carlito'), url(/fonts/Carlito-Regular.ttf) format('truetype'); }
 @font-face { font-family: DocFont; font-weight: bold; src: local('Calibri Bold'), local('Carlito Bold'), url(/fonts/Carlito-Bold.ttf) format('truetype'); }

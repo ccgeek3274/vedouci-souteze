@@ -26,6 +26,7 @@ function data(): BulletinData {
     ],
     deficiencies: [{ team: 'Tým a', lines: ['Struck Petr: bude vyškrtnut'] }],
     sameClub: [['a', 'b']],
+    refs: { '1:a': 'R1', '2:a': 'Jiný Rozhodčí', '1:b': 'S1', '2:d': 'T1', '3:a': 'R1' },
     warnings: [],
   };
 }
@@ -46,9 +47,9 @@ describe('rich text', () => {
 describe('config', () => {
   it('normalizes stored JSON', () => {
     expect(normalizeConfig(null)).toEqual(defaultConfig());
-    const c = normalizeConfig({ kind: 'definitive', date: '2026-10-06', refs: { '1:a': 'X', bad: 3 }, texts: { intro: [{ insert: 'x\n' }], nope: [] }, withRef: false });
+    const c = normalizeConfig({ kind: 'definitive', date: '2026-10-06', refs: { '1:a': 'X' }, texts: { intro: [{ insert: 'x\n' }], nope: [] }, withRef: false });
     expect(c.kind).toBe('definitive');
-    expect(c.refs).toEqual({ '1:a': 'X' });
+    expect('refs' in c).toBe(false);
     expect(Object.keys(c.texts)).toEqual(['intro']);
     expect(c.withRef).toBe(false);
   });
@@ -68,7 +69,7 @@ describe('model', () => {
   });
 
   it('preliminary: deficiencies chapter, all players, exceptions in red, last round without exceptions', () => {
-    const m = buildModel(data(), { ...defaultConfig(), refs: { '2:a': 'Jiný Rozhodčí' } });
+    const m = buildModel(data(), defaultConfig());
     const titles = m.chapters.map((c) => c.title);
     expect(titles).toContain('Nedostatky soupisek');
     const rosters = m.chapters.find((c) => c.title === 'Soupisky družstev')!.sections[0] as any;
@@ -81,7 +82,7 @@ describe('model', () => {
     expect(rounds[2].rows[0].time).toBe('');
     expect(m.warnings.some((w) => w.includes('posledním kole'))).toBe(true);
     expect(m.warnings).toContain('Tým c: chybí soupiska');
-    expect(m.warnings.some((w) => w.includes('bez rozhodčího: Tým c'))).toBe(true);
+    expect(m.warnings).toContain('Utkání bez nasazeného rozhodčího: 1 (karta Nasazení rozhodčích)');
     expect(m.subtitles[1]).toBe('Předběžný úvodní zpravodaj – ročník 2026/2027');
     expect(m.fileName).toBe('rpb_26_27_uz_predbezny');
     const ann = m.chapters.find((c) => c.title === 'Další oznámení')!.sections[0] as any;

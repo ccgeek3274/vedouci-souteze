@@ -3,6 +3,9 @@
 // RPB 2026/27 bulletin (doc/soupisky/rpb_26_27_uz_v3.docx).
 import { matchStart, roundsText, shortTime, type StartTeam } from '../startTime';
 import { deltaBlocks, textDelta, type DeltaOp, type RichBlock } from './rich';
+import { refKey, rotatedReferees } from '../schedule';
+
+export { refKey, rotatedReferees };
 
 export const TEXT_KEYS = ['intro', 'requirements', 'referees', 'announcements', 'results'] as const;
 export type TextKey = (typeof TEXT_KEYS)[number];
@@ -12,7 +15,6 @@ export type InitialConfig = {
   kind: 'preliminary' | 'definitive';
   date: string | null; // ISO date of issue; null = today
   texts: Partial<Record<TextKey, DeltaOp[]>>; // missing = the default text (follows the data)
-  refs: Record<string, string>; // refKey → referee, overrides the rotation ('' = none)
   withRef: boolean;
   calendar: boolean;
   lastNote: string | null; // note of the last round header; null = default
@@ -20,7 +22,7 @@ export type InitialConfig = {
 };
 
 export function defaultConfig(): InitialConfig {
-  return { kind: 'preliminary', date: null, texts: {}, refs: {}, withRef: true, calendar: true, lastNote: null, appData: { schedule: false, rosters: false } };
+  return { kind: 'preliminary', date: null, texts: {}, withRef: true, calendar: true, lastNote: null, appData: { schedule: false, rosters: false } };
 }
 
 /** Stored JSON → config (unknown / broken fields fall back to defaults). */
@@ -29,13 +31,10 @@ export function normalizeConfig(raw: unknown): InitialConfig {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, any>;
   const texts: InitialConfig['texts'] = {};
   for (const k of TEXT_KEYS) if (Array.isArray(r.texts?.[k])) texts[k] = r.texts[k];
-  const refs: Record<string, string> = {};
-  for (const [k, v] of Object.entries(r.refs ?? {})) if (typeof v === 'string') refs[k] = v;
   return {
     kind: r.kind === 'definitive' ? 'definitive' : 'preliminary',
     date: typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null,
     texts,
-    refs,
     withRef: typeof r.withRef === 'boolean' ? r.withRef : d.withRef,
     calendar: typeof r.calendar === 'boolean' ? r.calendar : d.calendar,
     lastNote: typeof r.lastNote === 'string' ? r.lastNote : null,
@@ -71,6 +70,7 @@ export type BulletinData = {
   teams: BTeam[]; // in start-number order
   rosters: Record<string, BPlayer[] | null>; // by team key; null = no roster
   rounds: BRound[];
+  refs: Record<string, string>; // refKey → assigned referee (karta Nasazení rozhodčích)
   deficiencies: { team: string; lines: string[] }[]; // preliminary bulletin: roster check findings
   sameClub: [string, string][]; // team keys of same-club pairs
   warnings: string[];
@@ -83,7 +83,7 @@ export const CONFLICT = '???';
 export type RosterRow = BPlayer & { display: string };
 export type RoundRow = {
   board: number; homeStc: number | null; homeName: string; time: string; // '' = default start
-  awayStc: number | null; awayName: string; ref: string; refKey: string; refOptions: string[];
+  awayStc: number | null; awayName: string; ref: string;
 };
 export type RoundView = { nr: number; header: string; rows: RoundRow[] };
 export type CalDay = { d: number; rounds: number[] } | null;
@@ -154,25 +154,6 @@ export function ambiguousNames(players: BPlayer[]): string[] {
   const seen = new Map<string, number>();
   for (const r of rows) seen.set(r.display.toLowerCase(), (seen.get(r.display.toLowerCase()) ?? 0) + 1);
   return [...new Set(rows.filter((r) => seen.get(r.display.toLowerCase())! > 1).map((r) => r.display))];
-}
-
-export const refKey = (round: number, homeKey: string) => `${round}:${homeKey}`;
-
-/** Referees per match: each team's home matches go round-robin through its referees (in contact order). */
-export function rotatedReferees(data: BulletinData): Map<string, string> {
-  const refs = new Map(data.teams.map((t) => [t.key, t.contacts.filter((c) => c.role === 'rozhodci' && c.name.trim()).map((c) => c.name.trim())]));
-  const count = new Map<string, number>();
-  const out = new Map<string, string>();
-  for (const r of [...data.rounds].sort((a, b) => a.nr - b.nr)) {
-    for (const m of r.matches) {
-      const list = refs.get(m.home) ?? [];
-      if (!list.length) continue;
-      const i = count.get(m.home) ?? 0;
-      out.set(refKey(r.nr, m.home), list[i % list.length]);
-      count.set(m.home, i + 1);
-    }
-  }
-  return out;
 }
 
 /** Months from the first to the last round, weeks Monday–Sunday (uvodni-zpravodaj calendarMonths). */
@@ -296,7 +277,6 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
 
   // Schedule with start-time exceptions and referees.
   const lastNr = data.rounds.length ? Math.max(...data.rounds.map((r) => r.nr)) : null;
-  const rotation = rotatedReferees(data);
   const rounds: RoundView[] = [...data.rounds].sort((a, b) => a.nr - b.nr).map((r) => {
     const last = r.nr === lastNr;
     let special = false;
@@ -310,12 +290,10 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
       const time = st.conflict ? CONFLICT : st.exception ? shortTime(st.time) : '';
       if (st.conflict) warnings.push(`Konflikt začátků v ${r.nr}. kole: ${h?.name} – ${a?.name}`);
       if (time) special = true;
-      const key = refKey(r.nr, m.home);
       return {
         board: i + 1, homeStc: h?.stc ?? null, homeName: h?.name ?? '?', time,
         awayStc: a?.stc ?? null, awayName: a?.name ?? '?',
-        ref: key in cfg.refs ? cfg.refs[key] : rotation.get(key) ?? '', refKey: key,
-        refOptions: (h?.contacts ?? []).filter((c) => c.role === 'rozhodci' && c.name.trim()).map((c) => c.name.trim()),
+        ref: data.refs[refKey(r.nr, m.home)] ?? '',
       };
     });
     const note = last ? (cfg.lastNote ?? defaultLastNote(lastStartOf(data))).trim() : '';
@@ -325,8 +303,8 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
     };
   });
   if (cfg.withRef) {
-    const noRef = data.teams.filter((t) => !t.contacts.some((c) => c.role === 'rozhodci' && c.name.trim())).map((t) => t.name);
-    if (noRef.length) warnings.push(`Družstva bez rozhodčího: ${noRef.join(', ')}`);
+    const noRef = rounds.reduce((n, r) => n + r.rows.filter((m) => !m.ref.trim()).length, 0);
+    if (noRef) warnings.push(`Utkání bez nasazeného rozhodčího: ${noRef} (karta Nasazení rozhodčích)`);
   }
 
   const exceptions = exceptionLines(data);
