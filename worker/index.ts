@@ -10,6 +10,7 @@ import { registry } from './routes/registry';
 import { draw } from './routes/draw';
 import { bulletins } from './routes/bulletins';
 import { referees } from './routes/referees';
+import { exportsApi } from './routes/exports';
 import { publicApi } from './routes/public';
 import type { AppEnv } from './types';
 
@@ -30,6 +31,7 @@ app.route('/', teams);
 app.route('/', draw);
 app.route('/', bulletins);
 app.route('/', referees);
+app.route('/', exportsApi);
 
 app.notFound((c) => c.json({ error: 'Nenalezeno' }, 404));
 app.onError((err, c) => {

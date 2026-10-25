@@ -47,4 +47,4 @@ Zadání: `doc/vedouci_podklady.md`, produktová specifikace: `doc/PRD.md`.
 - `../sscr-soupiska` — e-soupiska (xlsx mapping `fillSoupiska`, JSON draft v1)
 - `../kontrolasoupisky` — hromadný lookup hráčů
 - `../uvodni-zpravodaj`, `../sscr-zpravodaj` — generátory zpravodajů (DOCX/PDF)
-- `../swiss-manager-automat` — fáze 2, `../pgn-base` — fáze 3
+- `../swiss-manager-automat` — formát importu definuje Automat (`docs/FORMAT_SOUPISKY.md`), export viz `doc/feat-export-sm.md`; `../pgn-base` — fáze 3

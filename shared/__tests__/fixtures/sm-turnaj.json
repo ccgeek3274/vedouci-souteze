@@ -1,0 +1,109 @@
+{
+ "app": "vedouci-souteze",
+ "version": 1,
+ "savedAt": "2026-10-11T09:12:00+02:00",
+ "turnaj": {
+  "nazev": "Krajská soutěž 'A' 2026/27",
+  "zaklad": 2
+ },
+ "druzstva": [
+  {
+   "nazev": "Sokol Vzorov A",
+   "cislo_klubu": "12003",
+   "extra": {
+    "kapJmeno": "Fialka Miroslav",
+    "kapTel": "725 746 358",
+    "kapEmail": "miroslav.fialka@example.cz",
+    "zastJmeno": "Kubaljak Jaromír",
+    "zastTel": "602 123 971",
+    "zastEmail": "jaromir.kubaljak@example.cz",
+    "hraciMistnost": "Sokolovna, Příčná 12, 591 01 Vzorov (začátek 10:00)"
+   },
+   "hraci": [
+    {
+     "poradi": 1,
+     "lok": 710,
+     "jmeno": "Fialka Miroslav",
+     "pismenka": [
+      "Z",
+      "K"
+     ]
+    },
+    {
+     "poradi": 2,
+     "lok": 3026,
+     "jmeno": "Kubaljak Jaromír",
+     "pismenka": [
+      "Z",
+      "ZK"
+     ]
+    },
+    {
+     "poradi": 3,
+     "lok": 1920,
+     "jmeno": "Procházka Jaroslav",
+     "pismenka": [
+      "Z"
+     ]
+    },
+    {
+     "poradi": 4,
+     "lok": 6198,
+     "jmeno": "Gergelits Tomáš",
+     "pismenka": [
+      "V"
+     ]
+    },
+    {
+     "poradi": 5,
+     "lok": 50686,
+     "jmeno": "Petrášek Jiří",
+     "pismenka": [
+      "H"
+     ]
+    },
+    {
+     "poradi": 6,
+     "lok": 44678,
+     "jmeno": "Mlýnek Jakub",
+     "pismenka": [
+      "H"
+     ]
+    }
+   ]
+  },
+  {
+   "nazev": "TJ Jawa Brodce B",
+   "cislo_klubu": "12003",
+   "extra": {
+    "kapJmeno": "Steiner Juraj",
+    "kapTel": "725 746 358",
+    "kapEmail": "juraj.steiner@example.cz",
+    "zastJmeno": "Jukl Karel",
+    "zastTel": "602 123 971",
+    "zastEmail": "karel.jukl@example.cz",
+    "hraciMistnost": "Wellness Hotel Valnovka, Benešovská 102, Kamenice - Ládví"
+   },
+   "hraci": [
+    {
+     "poradi": 1,
+     "lok": 10792,
+     "jmeno": "Jukl Karel",
+     "pismenka": [
+      "Z",
+      "K"
+     ]
+    },
+    {
+     "poradi": 2,
+     "lok": 15601,
+     "jmeno": "Černý Jiří",
+     "pismenka": [
+      "Z",
+      "ZK"
+     ]
+    }
+   ]
+  }
+ ]
+}

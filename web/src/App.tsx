@@ -16,6 +16,7 @@ import { TeamDetail } from './pages/competition/TeamDetail';
 import { RosterCheck } from './pages/competition/RosterCheck';
 import { Draw } from './pages/competition/Draw';
 import { Bulletin } from './pages/competition/Bulletin';
+import { SwissManager } from './pages/competition/SwissManager';
 import { Referees } from './pages/competition/Referees';
 import { PublicSchedule } from './pages/PublicSchedule';
 
@@ -38,6 +39,7 @@ export function App() {
             <Route path="losovani" element={<Draw />} />
             <Route path="rozhodci" element={<Referees />} />
             <Route path="zpravodaj" element={<Bulletin />} />
+            <Route path="swiss-manager" element={<SwissManager />} />
             <Route path="t/:teamId" element={<TeamDetail />} />
           </Route>
           <Route path="/tokeny" element={<Tokens />} />
