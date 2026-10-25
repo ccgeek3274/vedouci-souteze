@@ -125,7 +125,8 @@ export const roundDate = (iso: string) => {
   const p = isoParts(iso);
   return p ? `${String(p.d).padStart(2, '0')}.${String(p.m).padStart(2, '0')}.${p.y}` : iso;
 };
-const todayIso = () => {
+/** Today as 'YYYY-MM-DD' in local time. */
+export const todayIso = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };

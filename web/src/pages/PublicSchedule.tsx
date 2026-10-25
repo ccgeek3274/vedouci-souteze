@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api, apiErrorText, ApiError } from '../lib/api';
-import { CONFLICT, roundDate } from '../../../shared/bulletin/initial';
+import { CONFLICT, roundDate, todayIso } from '../../../shared/bulletin/initial';
+import { currentRoundNr } from '../../../shared/schedule';
 import type { PublicSchedule as Data } from '../../../shared/publicSchedule';
 import { SkinSelect } from '../components/Layout';
 import { applySkin, getSkin } from '../lib/skin';
@@ -14,12 +15,19 @@ export function PublicSchedule() {
   const q = useQuery({ queryKey: ['public', id], queryFn: () => api.get<Data>(`/public/competitions/${id}`), retry: false });
   const d = q.data;
   const team = d && teamKey ? d.teams.find((t) => t.key === teamKey) : undefined;
+  const current = d ? currentRoundNr(d.rounds, todayIso()) : null;
+  const currentRef = useRef<HTMLElement | null>(null);
 
   // The public page has its own skin (default chess.cz); the app's skin is restored when leaving it.
   useEffect(() => {
     applySkin(getSkin('public'));
     return () => applySkin(getSkin('app'));
   }, []);
+
+  // Full schedule: scroll the round on the programme to the top of the page (the team page is short, stays put).
+  useEffect(() => {
+    if (!teamKey) currentRef.current?.scrollIntoView({ block: 'start' });
+  }, [d, teamKey]);
 
   useEffect(() => {
     if (d) document.title = `${team ? `${team.name} – ` : ''}${d.competition.name} – rozpis`;
@@ -61,7 +69,7 @@ export function PublicSchedule() {
               <thead><tr><th>Kolo</th><th>Datum</th><th>Začátek</th><th>Zápas</th><th>Rozhodčí</th></tr></thead>
               <tbody>
                 {d.rounds.flatMap((r) => r.matches.filter((m) => m.home === team.key || m.away === team.key).map((m) => (
-                  <tr key={r.nr}>
+                  <tr key={r.nr} className={r.nr === current ? 'pub-current' : undefined} ref={r.nr === current ? (el) => { currentRef.current = el; } : undefined}>
                     <td>{r.nr}.</td>
                     <td>{roundDate(r.date)}</td>
                     <td className={m.exception ? 'pub-exc' : ''}>{start(m)}</td>
@@ -97,10 +105,10 @@ export function PublicSchedule() {
           <div className="card-strip"><h2>Rozpis – kompletní rozpis</h2></div>
           {!d.rounds.length && <div className="card-body muted">Rozlosování zatím není k dispozici.</div>}
           {d.rounds.map((r) => (
-              <table key={r.nr} className="table pub-table pub-round">
+              <table key={r.nr} className={`table pub-table pub-round${r.nr === current ? ' pub-current' : ''}`} ref={r.nr === current ? (el) => { currentRef.current = el; } : undefined}>
                 <colgroup><col className="pub-c-time" /><col /><col className="pub-c-dash" /><col /><col className="pub-c-ref" /></colgroup>
                 <thead>
-                  <tr><th>Začátek</th><th colSpan={3}>{r.nr}. kolo – {roundDate(r.date)}{r.last ? ' (poslední kolo)' : ''}</th><th>Rozhodčí</th></tr>
+                  <tr><th>Začátek</th><th colSpan={3}>{r.nr}. kolo – {roundDate(r.date)}{r.last ? ' (poslední kolo)' : ''}{r.nr === current && <span className="pub-badge">na programu</span>}</th><th>Rozhodčí</th></tr>
                 </thead>
                 <tbody>
                   {r.matches.map((m) => (

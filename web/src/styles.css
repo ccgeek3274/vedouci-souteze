@@ -282,6 +282,15 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
 .public-teams { display: flex; flex-wrap: wrap; gap: 6px; }
 .public-teams .chip { text-decoration: none; height: auto; padding: 3px 8px; }
 [data-skin="chess"] .public-links a { color: var(--brand); }
+/* Round on the programme: highlighted, scrolled to the top of the page */
+.pub-current { scroll-margin-top: 8px; }
+table.pub-current { outline: 2px solid var(--danger); outline-offset: -1px; }
+.pub-current td { background: var(--highlight); font-weight: 600; }
+.pub-current thead th { background: var(--ink); color: var(--paper); }
+[data-skin="chess"] .pub-current thead th { background: var(--red); }
+.pub-badge { margin-left: 10px; padding: 1px 6px; border-radius: var(--radius); background: var(--danger); color: #fff;
+  font-size: 0.85em; font-weight: 600; white-space: nowrap; }
+[data-skin="chess"] .pub-badge { background: #fff; color: var(--red); }
 @media (max-width: 640px) {
   .ref-rounds { grid-template-columns: 1fr; }
   .pub-c-time { width: 52px; } .pub-c-ref { width: 28%; }

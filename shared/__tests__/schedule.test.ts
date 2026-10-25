@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competitionSchedule, pairCzTeams, rotatedReferees, sameName, scheduleRounds, type SchedAppTeam } from '../schedule';
+import { competitionSchedule, currentRoundNr, pairCzTeams, rotatedReferees, sameName, scheduleRounds, type SchedAppTeam } from '../schedule';
 
 const app = (id: string, name: string, draw_no: number | null, extra: Partial<SchedAppTeam> = {}): SchedAppTeam =>
   ({ id, name, chesscz_team_id: null, draw_no, position: draw_no ?? 0, club_code: null, club_name: '', ...extra });
@@ -48,5 +48,12 @@ describe('schedule', () => {
     expect(sameName('Meca Viktor,st.', 'Meca Viktor st.')).toBe(true);
     expect(sameName('Meca Viktor', 'Meca Viktor st.')).toBe(false);
     expect(sameName('', '')).toBe(false);
+  });
+
+  it('current round = first round dated today or later', () => {
+    const rounds = [{ nr: 2, date: '2026-11-08' }, { nr: 1, date: '2026-10-11' }, { nr: 3, date: '' }];
+    expect(currentRoundNr(rounds, '2026-10-11')).toBe(1);
+    expect(currentRoundNr(rounds, '2026-10-12')).toBe(2);
+    expect(currentRoundNr(rounds, '2026-11-09')).toBe(null);
   });
 });

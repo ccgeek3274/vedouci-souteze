@@ -20,6 +20,9 @@
 - Veřejná stránka bez přihlášení `/rozpis/:id` (id soutěže = UUID, neuhodnutelné), vzor
   https://www.chess.cz/soutez/rozpis/3468/: kola, sloupec Začátek (výjimky červeně, poslední kolo `last_start`),
   domácí – hosté, Rozhodčí. Záhlaví: odkaz na soutěž na chess.cz a chess-results (`compWww` z detailu soutěže).
+- Aktuální kolo („na programu“) = první kolo s datem ≥ dnes (`currentRoundNr`, `shared/schedule.ts`, datum prohlížeče);
+  v kompletním rozpisu je zvýrazněné a stránka se po načtení odroluje tak, aby bylo u horního okraje. Na stránce
+  družstva se jen zvýrazní řádek (stránka je krátká, neroluje). Po posledním kole se nezvýrazňuje nic.
 - `/rozpis/:id/druzstvo/:key` — vzor https://www.chess.cz/soutez/druzstvo/3468/212974/ bez soupisky: Kolo, Datum,
   Začátek, Zápas, Rozhodčí; kontakty jen kapitán (jméno, telefon, e-mail) a hrací místnost.
 - Přepínač vzhledu v záhlaví veřejné stránky, výchozí „chess.cz“. Volba se pamatuje v prohlížeči zvlášť

@@ -79,6 +79,12 @@ export type SchedMatch = {
 };
 export type SchedRound = { nr: number; date: string; start: string; last: boolean; matches: SchedMatch[] };
 
+/** Round "on the programme": the first one dated today or later (null when all are past or undated). */
+export function currentRoundNr(rounds: { nr: number; date: string }[], today: string): number | null {
+  const next = [...rounds].sort((a, b) => a.nr - b.nr).find((r) => /^\d{4}-\d{2}-\d{2}/.test(r.date) && r.date.slice(0, 10) >= today);
+  return next?.nr ?? null;
+}
+
 /** Rounds with the start of every match (start-time exceptions, the last round at lastStart). */
 export function scheduleRounds<T extends StartTeam>(s: { teams: SchedTeam<T>[]; rounds: BRound[] }, defaultStart: string, lastStart = ''): SchedRound[] {
   const team = new Map(s.teams.map((t) => [t.key, t.app]));
