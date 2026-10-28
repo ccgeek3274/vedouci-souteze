@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import sample from './fixtures/sm-turnaj.json';
-import { buildSmExport, samePerson, smCaptainText, smExportFileName, smInfoAuto, smLetters, type SmSourcePlayer, type SmSourceTeam } from '../export/swissManager';
+import { buildSmExport, samePerson, smExportFileName, smInfoAuto, smLetters, type SmSourcePlayer, type SmSourceTeam } from '../export/swissManager';
 
 const player = (name: string, lok: number | null, flags = '', base = 1, extra: Partial<SmSourcePlayer> = {}): SmSourcePlayer =>
   ({ name, birth_year: null, lok, fide: null, flags, base, struck: 0, cz: null, ...extra });
@@ -40,7 +40,8 @@ describe('Swiss-Manager export', () => {
       druzstva: [{
         nazev: 'Sokol Vzorov A', zkratka: 'Vzorov A', los: 1, cislo_klubu: '12003', soupiska_verze: 3,
         extra: {
-          kapJmeno: 'A Kapitán', kapTel: '', kapEmail: '', zastJmeno: '', zastTel: '', zastEmail: '',
+          kapJmeno: 'A Kapitán', kapTel: '725 746 358', kapEmail: 'k@example.cz',
+          zastJmeno: 'A Zástupce', zastTel: '602 123 971', zastEmail: 'z@example.cz',
           hraciMistnost: 'Sokolovna, Příčná 12',
         },
         hraci: [
@@ -53,7 +54,7 @@ describe('Swiss-Manager export', () => {
     expect(Object.keys(file.druzstva[0])).toEqual(['nazev', 'zkratka', 'los', 'cislo_klubu', 'soupiska_verze', 'extra', 'hraci']);
   });
 
-  it('matches the sample of swiss-manager-automat (priklady/turnaj.json) apart from our extra keys and the options', () => {
+  it('matches the sample of swiss-manager-automat (priklady/turnaj.json) apart from our extra keys', () => {
     const src = sample.druzstva[0];
     const t: SmSourceTeam = {
       name: src.nazev, club_code: src.cislo_klubu, draw_no: null, position: 1, venue: src.extra.hraciMistnost,
@@ -69,17 +70,10 @@ describe('Swiss-Manager export', () => {
         }),
       },
     };
-    const build = (options: Parameters<typeof buildSmExport>[0]['options']) => {
-      const { file } = buildSmExport({ competition: { id: 'x', name: sample.turnaj.nazev, season: '', boards: sample.turnaj.zaklad }, savedAt: sample.savedAt, teams: [t], options });
-      const { id, ...turnaj } = file.turnaj;
-      const { soupiska_verze, ...team } = file.druzstva[0];
-      return { ...file, turnaj, druzstva: [team] };
-    };
-    // Default options: captain's name only.
-    expect(build(undefined)).toEqual({ ...sample, druzstva: [{ ...src, extra: { ...src.extra, kapTel: '', kapEmail: '', zastJmeno: '', zastTel: '', zastEmail: '' } }] });
-    // Everything: the extra fields as in the sample, the SM cell holds both people with contacts.
-    expect(build({ captain: true, deputy: true, contacts: true })).toEqual({ ...sample, druzstva: [{ ...src, extra: { ...src.extra,
-      kapJmeno: `${src.extra.kapJmeno}, ${src.extra.kapTel}, ${src.extra.kapEmail}; zást. ${src.extra.zastJmeno}, ${src.extra.zastTel}, ${src.extra.zastEmail}` } }] });
+    const { file } = buildSmExport({ competition: { id: 'x', name: sample.turnaj.nazev, season: '', boards: sample.turnaj.zaklad }, savedAt: sample.savedAt, teams: [t] });
+    const { id, ...turnaj } = file.turnaj;
+    const { soupiska_verze, ...team } = file.druzstva[0];
+    expect({ ...file, turnaj, druzstva: [team] }).toEqual({ ...sample, druzstva: [src] });
   });
 
   it('orders teams by draw number, teams without one last', () => {
@@ -126,7 +120,7 @@ describe('Swiss-Manager export', () => {
     expect(texts).toEqual(expect.arrayContaining([
       expect.stringMatching(/^error A: 1\. Bez ID: chybí LOK i FIDE ID/),
       expect.stringMatching(/^warn A: Chybí číslo klubu/),
-      expect.stringMatching(/^info A: Info \(hrací místnost a začátek\) má 80 znaků/),
+      expect.stringMatching(/^info A: Hrací místnost se do Info \(70 znaků\) nevejde/),
       expect.stringMatching(/^warn A: Základ má 1 hráčů/),
       expect.stringMatching(/^warn A: Na soupisce není zástupce kapitána/),
       expect.stringMatching(/^info A: K na soupisce je Bez ID, v kontaktech Někdo Jiný/),
@@ -134,24 +128,18 @@ describe('Swiss-Manager export', () => {
     ]));
   });
 
-  it('Info: venue + nonstandard home start, truncated to 70 chars unless edited', () => {
-    expect(smInfoAuto({ venue: 'Sokolovna', start_home: '10:00', start_home_skip: '3,7' }, '09:00')).toBe('Sokolovna (začátek 10:00, neplatí v 3. a 7. kole)');
+  it('Info: venue + nonstandard home start, the venue is cut so that the start fits into 70 chars', () => {
+    expect(smInfoAuto({ venue: 'Sokolovna', start_home: '10:00' }, '09:00')).toBe('Sokolovna (10:00)');
     expect(smInfoAuto({ venue: 'Sokolovna', start_home: '09:00' }, '9:00')).toBe('Sokolovna');
-    expect(smInfoAuto({ venue: '', start_home: '10:00' }, '09:00')).toBe('začátek 10:00');
+    expect(smInfoAuto({ venue: '', start_home: '10:00' }, '09:00')).toBe('(10:00)');
+    const cut = smInfoAuto({ venue: `${'x'.repeat(60)}, Brandýs`, start_home: '9:30' }, '09:00');
+    expect(cut).toBe(`${'x'.repeat(60)}, B (9:30)`);
+    expect(cut.length).toBeLessThanOrEqual(70);
     const long = team('A', 1, 1, full('A', 100), { venue: 'x'.repeat(80) });
     const edited = team('B', 2, 2, full('B', 200), { venue: 'x'.repeat(80), sm_info: 'Moje info' });
     const { file, teams } = buildSmExport({ competition: comp, savedAt, teams: [long, edited] });
     expect(file.druzstva.map((d) => d.extra.hraciMistnost)).toEqual(['x'.repeat(70), 'Moje info']);
-    expect(teams.map((v) => [v.infoAuto.length, v.infoSaved])).toEqual([[80, null], [80, 'Moje info']]);
-  });
-
-  it('captain cell by the options', () => {
-    const kap = { role: 'kapitan', name: 'Novák Jan', phone: '602 111 222', email: 'jan@example.cz' };
-    const zast = { role: 'zastupce', name: 'Dvořák Petr', phone: '', email: 'petr@example.cz' };
-    expect(smCaptainText(kap, zast, { captain: true, deputy: false, contacts: false })).toBe('Novák Jan');
-    expect(smCaptainText(kap, zast, { captain: true, deputy: true, contacts: false })).toBe('Novák Jan; zást. Dvořák Petr');
-    expect(smCaptainText(kap, zast, { captain: false, deputy: true, contacts: true })).toBe('zást. Dvořák Petr, petr@example.cz');
-    expect(smCaptainText(undefined, zast, { captain: true, deputy: false, contacts: true })).toBe('');
+    expect(teams.map((v) => [v.infoFull.length, v.infoSaved])).toEqual([[80, null], [80, 'Moje info']]);
   });
 
   it('warns about missing and duplicate short names', () => {

@@ -1,35 +1,13 @@
 import { useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import { useCompetition } from './CompetitionLayout';
 import { TeamName } from '../../components/TeamName';
-import { SM_DEFAULT_OPTIONS, SM_INFO_LIMIT, type SmFile, type SmIssue, type SmOptions, type SmTeamView } from '../../../../shared/export/swissManager';
+import { SM_INFO_LIMIT, type SmFile, type SmIssue, type SmTeamView } from '../../../../shared/export/swissManager';
 
 type Preview = { file: SmFile; issues: SmIssue[]; teams: SmTeamView[]; filename: string };
 
 const LEVEL_TAG: Record<SmIssue['level'], [string, string]> = { error: ['bad', 'chyba'], warn: ['warn', 'pozor'], info: ['ink', 'info'] };
-const OPTIONS_KEY = 'vs-sm-options';
-
-// The options are a per-viewer convenience (remembered in the browser), the export endpoint takes them as query params.
-function loadOptions(): SmOptions {
-  try {
-    return { ...SM_DEFAULT_OPTIONS, ...JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}') };
-  } catch {
-    return SM_DEFAULT_OPTIONS;
-  }
-}
-
-function Choice({ label, value, options, onChange }: { label: string; value: boolean; options: [string, string]; onChange: (v: boolean) => void }) {
-  return (
-    <div className="field"><label>{label}</label>
-      <div className="segmented">
-        <button type="button" className={value ? 'active' : ''} onClick={() => onChange(true)}>{options[0]}</button>
-        <button type="button" className={value ? '' : 'active'} onClick={() => onChange(false)}>{options[1]}</button>
-      </div>
-    </div>
-  );
-}
-
 /** Input saved on blur / Enter when the value changed; Escape reverts. */
 function SavedInput({ value, title, placeholder, maxLength, width, onSave }: {
   value: string; title?: string; placeholder?: string; maxLength?: number; width: number; onSave: (v: string) => Promise<void>;
@@ -61,21 +39,13 @@ function SavedInput({ value, title, placeholder, maxLength, width, onSave }: {
 export function SwissManager() {
   const { data: detail, refresh } = useCompetition();
   const c = detail.competition;
-  const [options, setOptionsState] = useState<SmOptions>(loadOptions);
   const [error, setError] = useState<string | null>(null);
-  const setOptions = (patch: Partial<SmOptions>) => {
-    const next = { ...options, ...patch };
-    setOptionsState(next);
-    try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
-  };
-  const query = `kapitan=${+options.captain}&zastupce=${+options.deputy}&kontakty=${+options.contacts}`;
   // Not cached: the export must reflect the rosters as they are now.
   const q = useQuery({
-    queryKey: ['export-sm', c.id, query],
-    queryFn: () => api.get<Preview>(`/competitions/${c.id}/export/swiss-manager?${query}`),
+    queryKey: ['export-sm', c.id],
+    queryFn: () => api.get<Preview>(`/competitions/${c.id}/export/swiss-manager`),
     staleTime: 0,
     gcTime: 0,
-    placeholderData: keepPreviousData,
   });
 
   const saveTeam = async (teamId: string, patch: { short_name?: string | null; sm_info?: string | null }) => {
@@ -119,12 +89,6 @@ export function SwissManager() {
             Do SM jde jen LOK / FIDE ID a písmena do sloupce Typ; jméno, rok a Elo z ověření na chess.cz slouží Automatu ke kontrole.
             V Automatu: <span className="mono">sm_vloz.py druzstva {filename} --vloz</span>, pak soupisky jednotlivých družstev.
           </p>
-          <div className="row" style={{ gap: 24, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 14 }}>
-            <Choice label="Kapitán" value={options.captain} options={['Ano', 'Ne']} onChange={(v) => setOptions({ captain: v })} />
-            <Choice label="Zástupce" value={options.deputy} options={['Ano', 'Ne']} onChange={(v) => setOptions({ deputy: v })} />
-            <Choice label="Údaje" value={!options.contacts} options={['Pouze jméno', 'Kontakty']} onChange={(v) => setOptions({ contacts: !v })} />
-          </div>
-          <p className="helper-text" style={{ marginTop: 0 }}>Volby určují obsah políčka „Kapitán týmu“ v SM; telefony a e-maily jdou do souboru jen s volbou Kontakty.</p>
           <div className="row">
             <button className="btn btn-primary" disabled={!file.druzstva.length || q.isFetching} onClick={download}>Stáhnout {filename}</button>
             <button className="btn" disabled={q.isFetching} onClick={() => q.refetch()}>Obnovit</button>
@@ -157,11 +121,11 @@ export function SwissManager() {
         <div className="card-body table-scroll">
           {error && <div className="alert">{error}</div>}
           <table className="table">
-            <thead><tr><th>Los</th><th>Družstvo</th><th>Zkratka</th><th>Č.kl.</th><th>Kapitán týmu</th><th>Info (hrací místnost, začátek)</th><th>Hráčů</th><th>Soupiska</th></tr></thead>
+            <thead><tr><th>Los</th><th>Družstvo</th><th>Zkratka</th><th>Č.kl.</th><th>Kapitán</th><th>Info (hrací místnost, začátek)</th><th>Hráčů</th><th>Soupiska</th></tr></thead>
             <tbody>
               {file.druzstva.map((t, i) => {
                 const v = teams[i];
-                const truncated = v.infoSaved == null && v.infoAuto.length > SM_INFO_LIMIT;
+                const truncated = v.infoSaved == null && v.infoFull.length > SM_INFO_LIMIT;
                 return (
                   <tr key={t.nazev}>
                     <td className="mono">{t.los ?? '—'}</td>
@@ -174,13 +138,13 @@ export function SwissManager() {
                       {v.id ? (
                         <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
                           <SavedInput width={420} value={t.extra.hraciMistnost} maxLength={SM_INFO_LIMIT} placeholder="bez hrací místnosti"
-                            title={v.infoAuto ? `Automaticky: ${v.infoAuto}` : undefined} onSave={(x) => saveTeam(v.id!, { sm_info: x || null })} />
-                          {truncated && <span className="tag warn" title={v.infoAuto}>ořezáno</span>}
+                            title={v.infoFull ? `Automaticky: ${v.infoFull}` : undefined} onSave={(x) => saveTeam(v.id!, { sm_info: x || null })} />
+                          {truncated && <span className="tag warn" title={v.infoFull}>ořezáno</span>}
                           {v.infoSaved != null && (
                             <button className="icon-btn" title={`Zpět na automatické: ${v.infoAuto || '(prázdné)'}`} onClick={() => saveTeam(v.id!, { sm_info: null })}>↺</button>
                           )}
                         </div>
-                      ) : <span title={v.infoAuto}>{t.extra.hraciMistnost || <span className="muted">—</span>}</span>}
+                      ) : <span title={v.infoFull}>{t.extra.hraciMistnost || <span className="muted">—</span>}</span>}
                     </td>
                     <td className="mono">{t.hraci.length}</td>
                     <td className="mono">{t.soupiska_verze != null ? `v${t.soupiska_verze}` : '—'}</td>

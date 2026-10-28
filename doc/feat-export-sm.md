@@ -14,7 +14,7 @@ s `SM_EXPORT_VERSION`.
 - `GET /api/v1/competitions/:id/export/swiss-manager` vrací náhled pro UI (`{ file, issues, filename }`).
 - `GET /api/v1/competitions/:id/export/swiss-manager.json` vrací samotný soubor s `Content-Disposition`
   (pro skripty s Bearer tokenem).
-- `web/src/pages/competition/SwissManager.tsx`: volby kapitána, náhled s editací zkratek a Info, upozornění, stažení.
+- `web/src/pages/competition/SwissManager.tsx`: náhled s editací zkratek a Info, upozornění, stažení.
   Záložka je před Zpravodajem.
 - `shared/teamShorten.ts` + `worker/lib/teamShortData.ts` + `worker/data/team-shorten/`: zkrácené názvy družstev.
 
@@ -29,8 +29,7 @@ s `SM_EXPORT_VERSION`.
 | `zkratka` | *navíc*: `teams.short_name` (Zkratka v SM), viz níž |
 | `los` | *navíc*: `teams.draw_no`. `sm_vloz` zakládá družstva v pořadí pole a to je startovní číslo v SM (Berger) |
 | `soupiska_verze` | *navíc*: číslo aktuální `roster_versions.version` |
-| `extra.kapJmeno` | text políčka **Kapitán týmu** v SM podle voleb (viz níž); Automat čte jen tohle |
-| `extra.kapTel` … `zastEmail` | `team_contacts` role `kapitan` / `zastupce`, první podle `position`; jen pokud to volby povolí, jinak `''` |
+| `extra.kap*`, `extra.zast*` | `team_contacts` role `kapitan` / `zastupce`, první podle `position`; vždy všechno |
 | `extra.hraciMistnost` | Info v SM: `teams.sm_info`, jinak automaticky, vždy nejvýš 70 znaků (viz níž) |
 | `hraci[]` | aktuální verze soupisky **bez vyškrtnutých** (`struck`), `poradi` přečíslované od 1 |
 | `lok`, `fide` | ze soupisky, chybějící doplněné z ověření na chess.cz (`cz_json.member`) |
@@ -42,20 +41,17 @@ vždy celé, prázdný řetězec = „vím, že je prázdné“.
 
 Klíče označené *navíc* Automat zatím nečte. Neznámé klíče ignoruje, takže verze formátu zůstává 1.
 
-## Kapitán týmu (volby na stránce)
-SM má jediné políčko „Kapitán týmu“ (`man1`) a Automat do něj píše `extra.kapJmeno`. Volby **Kapitán** Ano/Ne
-(výchozí Ano), **Zástupce** Ano/Ne (výchozí Ne), **Pouze jméno / Kontakty** (výchozí Pouze jméno) určují jeho obsah
-(`smCaptainText`): `Novák Jan`, `Novák Jan; zást. Dvořák Petr`, s kontakty `Novák Jan, 602 111 222, jan@…`.
-Telefony a e-maily jdou do souboru (i do `kapTel` …) jen s volbou Kontakty, zástupce jen s volbou Zástupce Ano.
-Volby si pamatuje prohlížeč (localStorage), API je bere z query `?kapitan=1&zastupce=0&kontakty=0`
-(chybí-li, platí výchozí — i pro `.json` endpoint skriptů).
+## Kapitán týmu
+Exportujeme vždy jméno, telefon i e-mail kapitána a zástupce. Co z toho napsat do políčka SM „Kapitán týmu“
+(jen jméno, se zástupcem, s kontakty), je volba **Automatu**, ne exportu: dnes píše jen `kapJmeno`.
+(Krátce tu byly přepínače na stránce, které skládaly text do `kapJmeno`; zrušeno, `kapJmeno` je zase jen jméno.)
 
 ## Info (hrací místnost)
-Automaticky (`smInfoAuto`) = `teams.venue` + nestandardní začátek domácích utkání ve stylu vzoru Automatu:
-`Sokolovna, Husova 12 (začátek 10:00, neplatí v 3. a 7. kole)` (`start_home` různý od `default_start`, kola z
-`start_home_skip`). SM bere jen 70 znaků, takže tabulka ukazuje a exportuje prvních 70 (plný text v tooltipu, štítek
-„ořezáno“). Upravená hodnota se ukládá do `teams.sm_info` (max 70, kontroluje API) a má přednost; prázdná / ↺ = zpět
-na automatické. Upravené Info se po změně hrací místnosti **neaktualizuje** samo.
+Automaticky (`smInfoAuto`) = `teams.venue` + nestandardní začátek domácích utkání jen jako čas v závorce:
+`Sokolovna, Husova 12 (10:00)` (`start_home` různý od `default_start`; kola, kde výjimka neplatí, se neuvádějí).
+SM bere jen 70 znaků: ořezává se **hrací místnost**, čas na konci zůstane vždy celý. Tabulka ukazuje výsledných
+≤ 70 znaků, plný text je v tooltipu, ořezané mají štítek „ořezáno“. Upravená hodnota se ukládá do `teams.sm_info`
+(max 70, kontroluje API) a má přednost; prázdná / ↺ = zpět na automatické. Upravené Info se po změně hrací místnosti **neaktualizuje** samo.
 
 ## Zkrácený název (`teams.short_name`)
 Generuje se **jen na stránce SM**: náhled exportu doplní družstvům bez zkratky návrh a rovnou ho uloží, takže pozdější
