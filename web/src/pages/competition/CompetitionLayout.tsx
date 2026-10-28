@@ -43,8 +43,8 @@ export function CompetitionLayout() {
         <NavLink to="pozadavky">Požadavky{newRequests ? ` (${newRequests})` : ''}</NavLink>
         <NavLink to="losovani">Losování</NavLink>
         <NavLink to="rozhodci">Nasazení rozhodčích</NavLink>
-        <NavLink to="zpravodaj">Zpravodaj</NavLink>
         <NavLink to="swiss-manager">Swiss-Manager</NavLink>
+        <NavLink to="zpravodaj">Zpravodaj</NavLink>
       </nav>
       <Outlet context={{ data, refresh } satisfies CompetitionCtx} />
     </>

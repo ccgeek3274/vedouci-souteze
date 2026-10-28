@@ -7,6 +7,7 @@ import { normalizeDraft } from '../../shared/roster/draft';
 import { bestTeamMatch, teamNameScore } from '../../shared/text';
 import { normRounds, normTime, parseStartTime, shortTime, type StartSide } from '../../shared/startTime';
 import { CONSTRAINT_KINDS, type ConstraintKind } from '../../shared/draw/check';
+import { SM_INFO_LIMIT } from '../../shared/export/swissManager';
 import type { AppEnv } from '../types';
 
 const teams = new Hono<AppEnv>();
@@ -68,6 +69,9 @@ teams.patch('/teams/:teamId', async (c) => {
     f[k] = f[k] ? normTime(f[k]) : null;
     if (f[k] === '') return c.json({ error: 'Začátek musí mít tvar HH:MM' }, 400);
   }
+  // Empty = back to automatic: the SM page generates the short name again / builds Info from the venue.
+  for (const k of ['short_name', 'sm_info'] as const) if (k in f && !f[k]) f[k] = null;
+  if (typeof f.sm_info === 'string' && f.sm_info.length > SM_INFO_LIMIT) return c.json({ error: `Info pro Swiss-Manager smí mít nejvýš ${SM_INFO_LIMIT} znaků` }, 400);
   if (!Object.keys(f).length) return c.json({ error: 'Nic ke změně' }, 400);
   const stmts = [updateStatement(c.env.DB, 'teams', team.id, f as Record<string, string | number | null>)];
   if (f.status === 'active' && team.status === 'reserve') {

@@ -12,7 +12,8 @@
     "isolatedModules": true,
     "types": [
       "@cloudflare/workers-types"
-    ]
+    ],
+    "resolveJsonModule": true
   },
   "include": [
     "worker",

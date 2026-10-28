@@ -14,7 +14,7 @@ const EDITABLE = [
 ] as const;
 const NUMERIC = ['boards', 'chesscz_comp_id', 'published'] as const;
 const PHASES = ['preparation', 'draw', 'running', 'finished'];
-const TEAM_FIELDS = ['name', 'club_name', 'club_code', 'chesscz_team_id', 'draw_no', 'status', 'venue', 'shoes', 'start_pref', 'start_home', 'start_away', 'draw_requests', 'notes'] as const;
+const TEAM_FIELDS = ['name', 'club_name', 'club_code', 'chesscz_team_id', 'draw_no', 'status', 'venue', 'shoes', 'start_pref', 'start_home', 'start_away', 'draw_requests', 'notes', 'short_name', 'sm_info'] as const;
 const TEAM_NUMERIC = ['chesscz_team_id', 'draw_no'] as const;
 
 function validate(f: Record<string, unknown>): string | null {

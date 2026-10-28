@@ -3,6 +3,7 @@
 // extra optional keys (`los`, `soupiska_verze`, `turnaj.id`) are described in doc/feat-export-sm.md.
 
 import { flagParts } from '../roster/draft';
+import { normTime, roundsText, shortTime } from '../startTime';
 import { fold } from '../text';
 import type { CzCheck } from '../roster/verify';
 
@@ -25,22 +26,37 @@ export type SmSourcePlayer = {
 export type SmSourceContact = { role: string; position?: number; name: string; phone: string; email: string };
 
 export type SmSourceTeam = {
+  id?: string;
   name: string;
+  /** Short name (SM "Zkratka"); the Worker generates the missing ones before the export. */
+  short_name?: string | null;
   club_code: string | null;
   draw_no: number | null;
   position: number;
   venue: string;
+  start_home?: string | null;
+  start_home_skip?: string;
+  /** Edited SM "Info"; null = automatic (smInfoAuto). */
+  sm_info?: string | null;
   contacts: SmSourceContact[];
   /** Current roster version; null = the team has no roster yet. */
   roster: { version: number; players: SmSourcePlayer[] } | null;
 };
 
+/** What goes into the SM "Kapitán týmu" cell (doc/feat-export-sm.md). */
+export type SmOptions = { captain: boolean; deputy: boolean; contacts: boolean };
+export const SM_DEFAULT_OPTIONS: SmOptions = { captain: true, deputy: false, contacts: false };
+
 export type SmExportInput = {
-  competition: { id: string; name: string; season: string; boards: number };
+  competition: { id: string; name: string; season: string; boards: number; default_start?: string };
   /** Active teams only. */
   teams: SmSourceTeam[];
   savedAt: string;
+  options?: SmOptions;
 };
+
+/** Per-team data for the editable table of the SM page, in the order of `file.druzstva`. */
+export type SmTeamView = { id: string | null; name: string; shortName: string; infoAuto: string; infoSaved: string | null; captain: string };
 
 export type SmPlayer = {
   poradi: number;
@@ -55,6 +71,7 @@ export type SmPlayer = {
 
 export type SmTeam = {
   nazev: string;
+  zkratka?: string;
   los?: number;
   cislo_klubu?: string;
   soupiska_verze?: number;
@@ -92,6 +109,28 @@ export function samePerson(a: string, b: string): boolean {
 
 const positive = (v: number | null | undefined): number | undefined => (v != null && v > 0 ? v : undefined);
 
+/**
+ * Automatic SM "Info": the playing venue followed by the nonstandard start of home matches
+ * ("Sokolovna, Husova 12 (začátek 10:00, neplatí v 3. a 7. kole)"), as in the Automat sample. Not truncated — the page shows the first 70 chars.
+ */
+export function smInfoAuto(t: Pick<SmSourceTeam, 'venue' | 'start_home' | 'start_home_skip'>, defaultStart = ''): string {
+  const venue = t.venue.trim();
+  const start = normTime(t.start_home);
+  if (!start || start === normTime(defaultStart)) return venue;
+  const skip = roundsText(t.start_home_skip);
+  const text = `začátek ${shortTime(start)}${skip ? `, neplatí v ${skip}` : ''}`;
+  return venue ? `${venue} (${text})` : text;
+}
+
+/** The SM "Kapitán týmu" cell: captain and/or deputy, names only or with phone and e-mail. */
+export function smCaptainText(kap: SmSourceContact | undefined, zast: SmSourceContact | undefined, o: SmOptions): string {
+  const person = (c: SmSourceContact | undefined) =>
+    !c?.name ? '' : o.contacts ? [c.name, c.phone, c.email].map((x) => x.trim()).filter(Boolean).join(', ') : c.name;
+  const k = o.captain ? person(kap) : '';
+  const z = o.deputy ? person(zast) : '';
+  return [k, z && `zást. ${z}`].filter(Boolean).join('; ');
+}
+
 function contact(team: SmSourceTeam, role: string): SmSourceContact | undefined {
   return team.contacts.filter((c) => c.role === role).sort((a, b) => (a.position ?? 1) - (b.position ?? 1))[0];
 }
@@ -101,8 +140,9 @@ function smOrder(teams: SmSourceTeam[]): SmSourceTeam[] {
   return [...teams].sort((a, b) => (a.draw_no ?? Infinity) - (b.draw_no ?? Infinity) || a.position - b.position);
 }
 
-export function buildSmExport(input: SmExportInput): { file: SmFile; issues: SmIssue[] } {
+export function buildSmExport(input: SmExportInput): { file: SmFile; issues: SmIssue[]; teams: SmTeamView[] } {
   const { competition: comp } = input;
+  const options = input.options ?? SM_DEFAULT_OPTIONS;
   const issues: SmIssue[] = [];
   const add = (level: SmIssue['level'], team: string | null, text: string) => issues.push({ level, team, text });
 
@@ -119,6 +159,11 @@ export function buildSmExport(input: SmExportInput): { file: SmFile; issues: SmI
       : `Bez losovacího čísla (v SM budou na konci): ${withoutDraw.map((t) => t.name).join(', ')}.`);
   }
 
+  const shortNames = new Map<string, string[]>();
+  for (const t of teams) if (t.short_name) shortNames.set(fold(t.short_name), [...(shortNames.get(fold(t.short_name)) ?? []), t.name]);
+  for (const names of shortNames.values()) if (names.length > 1) add('warn', null, `Stejný zkrácený název mají: ${names.join(', ')}.`);
+
+  const views: SmTeamView[] = [];
   const seenIds = new Map<string, string>();
   const druzstva = teams.map((t): SmTeam => {
     const kap = contact(t, 'kapitan');
@@ -128,7 +173,14 @@ export function buildSmExport(input: SmExportInput): { file: SmFile; issues: SmI
 
     if (!t.roster) add('warn', t.name, 'Nemá soupisku — v SM se založí jen družstvo.');
     if (!t.club_code) add('warn', t.name, 'Chybí číslo klubu (Č.kl. v SM zůstane prázdné).');
-    if (t.venue.length > SM_INFO_LIMIT) add('info', t.name, `Hrací místnost má ${t.venue.length} znaků, SM ji ořeže na ${SM_INFO_LIMIT}.`);
+    const infoAuto = smInfoAuto(t, comp.default_start);
+    const info = (t.sm_info ?? infoAuto).slice(0, SM_INFO_LIMIT);
+    if (t.sm_info == null && infoAuto.length > SM_INFO_LIMIT) {
+      add('info', t.name, `Info (hrací místnost a začátek) má ${infoAuto.length} znaků, do SM jde prvních ${SM_INFO_LIMIT} — zkraťte ho v tabulce.`);
+    }
+    if (!t.short_name) add('warn', t.name, 'Chybí zkrácený název (Zkratka v SM si SM dopočítá z názvu).');
+    const captain = smCaptainText(kap, zast, options);
+    views.push({ id: t.id ?? null, name: t.name, shortName: t.short_name ?? '', infoAuto, infoSaved: t.sm_info ?? null, captain });
     if (struck) add('info', t.name, `Vynecháno vyškrtnutých hráčů: ${struck} (pořadí je přečíslované).`);
 
     const hraci = players.map((p, i): SmPlayer => {
@@ -169,13 +221,20 @@ export function buildSmExport(input: SmExportInput): { file: SmFile; issues: SmI
 
     return {
       nazev: t.name,
+      ...(t.short_name ? { zkratka: t.short_name } : {}),
       ...(t.draw_no != null ? { los: t.draw_no } : {}),
       ...(t.club_code ? { cislo_klubu: t.club_code } : {}),
       ...(t.roster ? { soupiska_verze: t.roster.version } : {}),
+      // Automat writes only kapJmeno (SM "Kapitán týmu") and hraciMistnost (SM "Info"); the rest follows the options
+      // so that the file does not carry contacts the manager chose not to export.
       extra: {
-        kapJmeno: kap?.name ?? '', kapTel: kap?.phone ?? '', kapEmail: kap?.email ?? '',
-        zastJmeno: zast?.name ?? '', zastTel: zast?.phone ?? '', zastEmail: zast?.email ?? '',
-        hraciMistnost: t.venue,
+        kapJmeno: captain,
+        kapTel: options.captain && options.contacts ? kap?.phone ?? '' : '',
+        kapEmail: options.captain && options.contacts ? kap?.email ?? '' : '',
+        zastJmeno: options.deputy ? zast?.name ?? '' : '',
+        zastTel: options.deputy && options.contacts ? zast?.phone ?? '' : '',
+        zastEmail: options.deputy && options.contacts ? zast?.email ?? '' : '',
+        hraciMistnost: info,
       },
       hraci,
     };
@@ -190,6 +249,7 @@ export function buildSmExport(input: SmExportInput): { file: SmFile; issues: SmI
       druzstva,
     },
     issues,
+    teams: views,
   };
 }
 

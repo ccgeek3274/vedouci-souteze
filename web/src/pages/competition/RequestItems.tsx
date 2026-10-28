@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
 import { REQUEST_KIND_LABEL, REQUEST_STATUS_LABEL } from '../../lib/format';
 import type { Request } from '../../lib/types';
 import { normRounds, normTime, roundsText, shortTime } from '../../../../shared/startTime';
 import { CONSTRAINT_LABEL, describeDraw, drawConstraints, manualResolution, tableSize, type ConditionState, type ConstraintKind } from '../../../../shared/draw/check';
 import { useCompetition } from './CompetitionLayout';
+import { TeamName } from '../../components/TeamName';
 
 // Requests shared by the Požadavky tab, the team page and the Losování tab: read-only rows with an "Upravit"
 // button opening one form (the same fields as a new request). Draw requests (kind draw_no) carry a structured
@@ -228,7 +228,7 @@ export function RequestTable({ requests, showTeam = true, showKind = true, state
         return (
           <div key={r.id} className={`req-row${showTeam ? ' with-team' : ''}`}>
             {showTeam && (
-              <div className="req-team">{r.team_id ? <Link to={`../t/${r.team_id}`}>{name(r.team_id)}</Link> : <span className="muted">celá soutěž</span>}</div>
+              <div className="req-team">{r.team_id ? <TeamName id={r.team_id} name={name(r.team_id)} link /> : <span className="muted">celá soutěž</span>}</div>
             )}
             <div className="req-main">
               <div>{showKind && <span className="req-kind">{REQUEST_KIND_LABEL[r.kind]}</span>}{summary}</div>

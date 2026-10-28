@@ -163,7 +163,7 @@ export function TeamDetail() {
   );
 }
 
-const FIELDS = ['name', 'club_name', 'club_code', 'venue', 'shoes', 'draw_no', 'notes'] as const;
+const FIELDS = ['name', 'short_name', 'club_name', 'club_code', 'venue', 'shoes', 'draw_no', 'notes'] as const;
 type Field = (typeof FIELDS)[number];
 
 /**
@@ -178,7 +178,7 @@ function TeamFields({ team, requests, defaultStart, onSaved }: { team: Team; req
   const [form, setForm] = useState<Record<Field, string>>({} as Record<Field, string>);
   const [error, setError] = useState<string | null>(null);
   const reset = () => setForm({
-    name: team.name, club_name: team.club_name ?? '', club_code: team.club_code ?? '', venue: team.venue ?? '',
+    name: team.name, short_name: team.short_name ?? '', club_name: team.club_name ?? '', club_code: team.club_code ?? '', venue: team.venue ?? '',
     shoes: shoesValue(team.shoes ?? ''), draw_no: team.draw_no == null ? '' : String(team.draw_no), notes: team.notes ?? '',
   });
   useEffect(reset, [team]);
@@ -204,6 +204,7 @@ function TeamFields({ team, requests, defaultStart, onSaved }: { team: Team; req
   ].filter(Boolean);
   const none = <span className="muted">—</span>;
   const rows: { label: string; value: React.ReactNode; filled: boolean }[] = [
+    { label: 'Zkrácený název', value: team.short_name || <span className="muted">vygeneruje se na záložce Swiss-Manager</span>, filled: !!team.short_name },
     { label: 'Oddíl', value: club || none, filled: !!club },
     { label: 'Hrací místnost', value: team.venue || none, filled: !!team.venue },
     { label: 'Přezůvky', value: shoes || <span className="muted">nezadáno</span>, filled: shoes === 'ano' },
@@ -258,6 +259,8 @@ function TeamFields({ team, requests, defaultStart, onSaved }: { team: Team; req
             <div className="grid-2">
               <div className="field"><label>Název družstva</label>
                 <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div className="field"><label>Zkrácený název</label>
+                <input className="input" value={form.short_name} placeholder="vygeneruje se na záložce Swiss-Manager" onChange={(e) => setForm({ ...form, short_name: e.target.value })} /></div>
               <div className="field"><label>Oddíl</label>
                 <ClubInput name={form.club_name} code={form.club_code} onChange={(p) => setForm((x) => ({ ...x, ...p }))} /></div>
               <div className="field" style={{ gridColumn: 'span 2' }}><label>Hrací místnost</label>

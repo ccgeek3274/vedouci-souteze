@@ -135,6 +135,9 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
 .icon-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 15px; padding: 2px 5px; }
 .icon-btn:hover { color: var(--ink); }
 .icon-btn:disabled { opacity: 0.3; cursor: default; }
+.team-name { white-space: normal; }
+.team-link { display: inline-flex; vertical-align: -1px; margin-left: 4px; color: var(--muted); text-decoration: none; }
+.team-link:hover { color: var(--ink); }
 .diff-add { color: var(--ok); } .diff-del { color: var(--danger); }
 .section-title { font: 700 12px var(--mono); letter-spacing: 0.05em; text-transform: uppercase; margin: 22px 0 10px; }
 .section-title:first-child { margin-top: 0; }

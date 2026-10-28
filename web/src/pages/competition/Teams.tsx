@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import type { TeamWithSummary } from '../../lib/types';
 import { bestTeamMatch, fold } from '../../../../shared/text';
 import { roundsText, shortTime } from '../../../../shared/startTime';
 import { useCompetition } from './CompetitionLayout';
+import { TeamName } from '../../components/TeamName';
 
 type TableRow = { teamId: number; teamName: string };
 const asArray = <T,>(d: T | T[] | null | undefined): T[] => (Array.isArray(d) ? d : d != null ? [d] : []);
@@ -57,7 +57,7 @@ export function Teams() {
                   <tr key={t.id}>
                     <td className="mono muted">{i + 1}.</td>
                     <td>
-                      <Link to={`../t/${t.id}`} style={{ fontWeight: 600 }}>{t.name}</Link>
+                      <TeamName id={t.id} name={t.name} link bold />
                       {t.chesscz_team_id && chessczName.get(t.chesscz_team_id) && fold(chessczName.get(t.chesscz_team_id)) !== fold(t.name) && (
                         <div className="muted" style={{ fontSize: 12.5 }}>chess.cz: {chessczName.get(t.chesscz_team_id)}</div>
                       )}
@@ -96,7 +96,7 @@ export function Teams() {
               <tbody>
                 {reserve.map((t) => (
                   <tr key={t.id} className="reserve">
-                    <td><Link to={`../t/${t.id}`}>{t.name}</Link></td>
+                    <td><TeamName id={t.id} name={t.name} link /></td>
                     <td>{t.roster ? `${t.roster.players} hráčů` : ''}</td>
                     <td className="actions"><button className="btn btn-small" onClick={() => setStatus(t, 'active')}>Vrátit do soutěže</button></td>
                   </tr>
@@ -201,7 +201,7 @@ function ChessczPairing() {
               <tbody>
                 {active.map((t) => (
                   <tr key={t.id}>
-                    <td>{t.name}</td>
+                    <td><TeamName id={t.id} name={t.name} /></td>
                     <td>
                       <select className="input input-sm" value={pairs[t.id] ?? ''} onChange={(e) => setPairs({ ...pairs, [t.id]: e.target.value })}>
                         <option value="">— nespárováno —</option>

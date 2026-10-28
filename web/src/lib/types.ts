@@ -15,6 +15,8 @@ export type Team = {
   id: string; competition_id: string; name: string; club_name: string; club_code: string | null;
   chesscz_team_id: number | null; position: number; draw_no: number | null; status: 'active' | 'reserve';
   venue: string; shoes: string; start_pref: string; start_home: string | null; start_away: string | null; start_home_skip: string; start_away_skip: string; draw_requests: string; notes: string;
+  short_name: string | null; // Swiss-Manager "Zkratka", generated on the SM page
+  sm_info: string | null; // edited SM "Info", null = automatic
 };
 export type TeamWithSummary = Team & {
   contacts: Contact[];

@@ -14,7 +14,9 @@ s `SM_EXPORT_VERSION`.
 - `GET /api/v1/competitions/:id/export/swiss-manager` vrací náhled pro UI (`{ file, issues, filename }`).
 - `GET /api/v1/competitions/:id/export/swiss-manager.json` vrací samotný soubor s `Content-Disposition`
   (pro skripty s Bearer tokenem).
-- `web/src/pages/competition/SwissManager.tsx`: náhled, upozornění, stažení.
+- `web/src/pages/competition/SwissManager.tsx`: volby kapitána, náhled s editací zkratek a Info, upozornění, stažení.
+  Záložka je před Zpravodajem.
+- `shared/teamShorten.ts` + `worker/lib/teamShortData.ts` + `worker/data/team-shorten/`: zkrácené názvy družstev.
 
 ## Převod
 | Formát | Odkud |
@@ -24,10 +26,12 @@ s `SM_EXPORT_VERSION`.
 | `turnaj.id` | *navíc*: `competitions.id`, aby šlo soubor dohledat |
 | `druzstva[]` | aktivní družstva (`status = 'active'`), **seřazená podle `draw_no`**, bez čísla na konci podle `position` |
 | `nazev`, `cislo_klubu` | `teams.name`, `teams.club_code` (chybí-li, klíč se vynechá) |
+| `zkratka` | *navíc*: `teams.short_name` (Zkratka v SM), viz níž |
 | `los` | *navíc*: `teams.draw_no`. `sm_vloz` zakládá družstva v pořadí pole a to je startovní číslo v SM (Berger) |
 | `soupiska_verze` | *navíc*: číslo aktuální `roster_versions.version` |
-| `extra.kap*`, `extra.zast*` | `team_contacts` role `kapitan` / `zastupce`, první podle `position` |
-| `extra.hraciMistnost` | `teams.venue` (SM ořeže na 70 znaků, Automat taky; hlásíme jen jako info) |
+| `extra.kapJmeno` | text políčka **Kapitán týmu** v SM podle voleb (viz níž); Automat čte jen tohle |
+| `extra.kapTel` … `zastEmail` | `team_contacts` role `kapitan` / `zastupce`, první podle `position`; jen pokud to volby povolí, jinak `''` |
+| `extra.hraciMistnost` | Info v SM: `teams.sm_info`, jinak automaticky, vždy nejvýš 70 znaků (viz níž) |
 | `hraci[]` | aktuální verze soupisky **bez vyškrtnutých** (`struck`), `poradi` přečíslované od 1 |
 | `lok`, `fide` | ze soupisky, chybějící doplněné z ověření na chess.cz (`cz_json.member`) |
 | `pismenka` | `base` → `Z`, `flags` → `H/V/C` a `K/ZK`, kanonicky `Z`, písmeno, funkce |
@@ -38,12 +42,42 @@ vždy celé, prázdný řetězec = „vím, že je prázdné“.
 
 Klíče označené *navíc* Automat zatím nečte. Neznámé klíče ignoruje, takže verze formátu zůstává 1.
 
+## Kapitán týmu (volby na stránce)
+SM má jediné políčko „Kapitán týmu“ (`man1`) a Automat do něj píše `extra.kapJmeno`. Volby **Kapitán** Ano/Ne
+(výchozí Ano), **Zástupce** Ano/Ne (výchozí Ne), **Pouze jméno / Kontakty** (výchozí Pouze jméno) určují jeho obsah
+(`smCaptainText`): `Novák Jan`, `Novák Jan; zást. Dvořák Petr`, s kontakty `Novák Jan, 602 111 222, jan@…`.
+Telefony a e-maily jdou do souboru (i do `kapTel` …) jen s volbou Kontakty, zástupce jen s volbou Zástupce Ano.
+Volby si pamatuje prohlížeč (localStorage), API je bere z query `?kapitan=1&zastupce=0&kontakty=0`
+(chybí-li, platí výchozí — i pro `.json` endpoint skriptů).
+
+## Info (hrací místnost)
+Automaticky (`smInfoAuto`) = `teams.venue` + nestandardní začátek domácích utkání ve stylu vzoru Automatu:
+`Sokolovna, Husova 12 (začátek 10:00, neplatí v 3. a 7. kole)` (`start_home` různý od `default_start`, kola z
+`start_home_skip`). SM bere jen 70 znaků, takže tabulka ukazuje a exportuje prvních 70 (plný text v tooltipu, štítek
+„ořezáno“). Upravená hodnota se ukládá do `teams.sm_info` (max 70, kontroluje API) a má přednost; prázdná / ↺ = zpět
+na automatické. Upravené Info se po změně hrací místnosti **neaktualizuje** samo.
+
+## Zkrácený název (`teams.short_name`)
+Generuje se **jen na stránce SM**: náhled exportu doplní družstvům bez zkratky návrh a rovnou ho uloží, takže pozdější
+úprava (tabulka SM nebo detail družstva) zůstane. Vymazání = při příští návštěvě SM se vygeneruje znovu.
+
+Algoritmus je port `../pgn-base` (`backend/src/lib/teamShorten.ts`, popis `docs/feat-team-name-shortening.md`):
+slovník zkratek klubů vytěžený z historických PGN (fuzzy shoda podle názvu) → obce ČR (nejdelší shoda) → heuristika;
+v rámci soutěže unikátní (kolize různých klubů dostanou další slovo, A/B jednoho klubu jen písmeno). Rozdíly proti pgn-base:
+- vrací diakritiku podle původního názvu (`restoreDiacritics`: `Sedlcany` → `Sedlčany`), PGN ji nechce, SM ano;
+- bez prefixu soutěže (Event tag) a bez admin overrides — override je ruční úprava zkratky u družstva;
+- data (`club_label_dict.json`, `gazetteer_obce.json`) jsou zkopírovaná jako dvojice do `worker/data/team-shorten/`
+  a zabalená do Workeru (~280 kB, gzip ~120 kB celý bundle), ne v D1 — jen se čtou a jen tady. Při přegenerování
+  dat v pgn-base zkopírovat znovu (`[label, clubName]`, `[full, core]`).
+
+Automat zatím `zkratka` nečte (SM si zkratku dopočítá z názvu sám); než ji začne zapisovat, slouží jen k přípravě.
+
 ## Upozornění (`issues`)
 - **error**: Automat soupisku nevloží nebo vyjde špatný turnaj. Hráč bez LOK i FIDE ID, stejné ID na dvou
   soupiskách, dvě družstva se stejným losovacím číslem.
-- **warn**: chybí losovací číslo, soupiska nebo číslo klubu; méně `Z` než šachovnic; `K` / `ZK` chybí nebo je víckrát.
+- **warn**: chybí losovací číslo, soupiska, číslo klubu nebo zkratka; dvě družstva se stejnou zkratkou; méně `Z` než šachovnic; `K` / `ZK` chybí nebo je víckrát.
   Automat písmena hlásí jako chybu, ale vložit nebrání.
-- **info**: vyškrtnutí vynecháni, neověření hráči (Automat pak nemá Elo ke kontrole), Info přes 70 znaků, kapitán
+- **info**: vyškrtnutí vynecháni, neověření hráči (Automat pak nemá Elo ke kontrole), automatické Info přes 70 znaků, kapitán
   na soupisce se jménem liší od kontaktu (`samePerson`: nezáleží na pořadí slov ani na přídomcích jako „st.“).
 
 Stáhnout jde vždycky i s chybami, rozhoduje vedoucí. Automat to stejně zkontroluje znovu proti Elo listině SM.

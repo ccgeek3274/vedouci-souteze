@@ -6,6 +6,7 @@ import { useCompetition } from './CompetitionLayout';
 import { loadChesscz } from '../../bulletin/load';
 import { competitionSchedule, refKey, rotatedReferees, sameName, scheduleRounds, teamReferees } from '../../../../shared/schedule';
 import { CONFLICT } from '../../../../shared/bulletin/initial';
+import { TeamName } from '../../components/TeamName';
 
 type Assignments = Record<string, string>;
 
@@ -178,9 +179,9 @@ export function Referees() {
                         <tr key={key}>
                           <td className="num">{m.board}</td>
                           <td>
-                            {team.get(m.home)?.name ?? '?'}
+                            <TeamName id={team.get(m.home)?.app?.id} name={team.get(m.home)?.name ?? '?'} />
                             {m.exception && <span className="ref-time"> {m.conflict ? CONFLICT : `${m.time} h`}</span>}
-                            <span className="muted"> – </span>{team.get(m.away)?.name ?? '?'}
+                            <span className="muted"> – </span><TeamName id={team.get(m.away)?.app?.id} name={team.get(m.away)?.name ?? '?'} />
                           </td>
                           <td className="ref-cell">
                             <input className={`input input-sm${isForeign ? ' ref-foreign' : ''}`} list={`ref-${key}`} value={v} placeholder="nenasazen"

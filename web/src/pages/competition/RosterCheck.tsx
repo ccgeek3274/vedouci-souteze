@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
 import { czDateTime } from '../../lib/format';
@@ -11,6 +10,7 @@ import { fold } from '../../../../shared/text';
 import { flagParts } from '../../../../shared/roster/draft';
 import type { Competition } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
+import { TeamName } from '../../components/TeamName';
 
 type Team = RosterCheckData['teams'][number];
 
@@ -123,7 +123,7 @@ function TeamCheck({ team, issues, busy, onCheck, onChanged }: {
   return (
     <div className="card">
       <div className="card-strip">
-        <h2 style={{ textTransform: 'none' }}><Link to={`../t/${team.id}`}>{team.name}</Link></h2>
+        <h2 style={{ textTransform: 'none' }}><TeamName id={team.id} name={team.name} link /></h2>
         <span className="helper">
           {team.club_code ? `oddíl ${team.club_code}${team.club_name ? ` · ${team.club_name}` : ''}` : 'oddíl neurčen'}
           {players.length > 0 && (at ? ` · ověřeno ${czDateTime(at)}` : ' · neověřeno')}
@@ -259,7 +259,7 @@ function VCheckCard({ competition: c, data, busy, onDone }: { competition: Compe
           <ul className="list-plain">
             {data.teams.filter((t) => t.players?.length).map((t) => {
               const found = t.players!.find((p) => p.v)?.v?.higherTeams ?? [];
-              return <li key={t.id}><b>{t.name}</b>: {found.length ? found.join(', ') : <span className="muted">žádné družstvo ve vyšší soutěži</span>}</li>;
+              return <li key={t.id}><TeamName id={t.id} name={t.name} bold />: {found.length ? found.join(', ') : <span className="muted">žádné družstvo ve vyšší soutěži</span>}</li>;
             })}
           </ul>
         )}

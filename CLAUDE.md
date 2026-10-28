@@ -35,6 +35,7 @@ Zadání: `doc/vedouci_podklady.md`, produktová specifikace: `doc/PRD.md`.
 - React Router 6: relativní `<Link to>` se skládá k cestě *routy* (`druzstva` → `druzstva/t/…`); mezi sourozeneckými
   záložkami soutěže používej `../t/…`.
 - Web nesmí importovat z `worker/` (typy Workers) — sdílené typy patří do `shared/`.
+- Název družstva v UI soutěže vždy přes `web/src/components/TeamName.tsx` (ikona → soupiska družstva, absolutní cesta).
 - Párování názvů družstev: `teamNameScore` (`shared/text.ts`) — různá písmena družstev (D/E) se nikdy nespárují.
 
 ## chess.cz API
