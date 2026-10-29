@@ -10,7 +10,7 @@ zpravodaje RPB 2026/27 (`doc/rpb_26_27_uz_v3.docx`) a o PDF (pdfmake + Carlito j
 - Aplikace doplní: hrací místnosti, kontakty (adresář), rozhodčí, schválené výjimky začátků (`start_home/away`).
   Do místnosti se nepíše začátek utkání — jiné začátky jsou v rozlosování (červeně u domácích) a v kapitole
   Specifické požadavky.
-- **Rozhodčí u zápasů** se přebírají z karty *Nasazení rozhodčích* (`doc/feat-rozhodci.md`), ve zpravodaji se už
+- **Rozhodčí u zápasů** se přebírají z karty *Nominace rozhodčích* (`doc/feat-rozhodci.md`), ve zpravodaji se už
   nemění. Starší koncepty s polem `refs` se ignorují.
 - **Ukládá se jen koncept** (tabulka `bulletins`, `key = 'initial'`): druh, datum vydání, texty,
   volby. Vygenerované DOCX/PDF se neukládají. **Save pointy** (`bulletin_savepoints`) = pojmenované kopie
@@ -41,7 +41,7 @@ Kalendář (volitelně, na nové stránce).
 ## Kód
 `shared/bulletin/initial.ts` (konfigurace, model kapitol, výchozí texty, rotace), `shared/bulletin/source.ts`
 (chess.cz / aplikace → vstup), `shared/bulletin/rich.ts` (Quill Delta), `web/src/bulletin/{load,docx,pdf,layout}.ts`,
-`web/src/pages/competition/Bulletin.tsx`, API `worker/routes/bulletins.ts`, písmo `web/public/fonts/Carlito-*`.
+`web/src/pages/competition/Bulletin.tsx` (přepínač zpravodajů `Bulletins.tsx`, zpravodaje z kol viz `doc/feat-zpravodaj-kola.md`), API `worker/routes/bulletins.ts`, písmo `web/public/fonts/Carlito-*`.
 
 ## Zobrazení označení hráčů
 - V celé aplikaci (detail družstva, náhled importu, editor soupisky) jsou tři samostatné sloupce ve stálém pořadí

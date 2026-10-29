@@ -1,8 +1,7 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
-import { czDateTime } from '../../lib/format';
 import type { RosterCheckData } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 import { RichEditor } from '../../components/RichEditor';
@@ -13,21 +12,21 @@ import {
   buildModel, CONFLICT, CZ_DAYS, normalizeConfig, type InitialConfig, type Section, type TextKey,
 } from '../../../../shared/bulletin/initial';
 import { pairs } from '../../bulletin/layout';
-
-type Stored = { config: unknown; updated_at: number | null; savepoints: { id: number; label: string; created_at: number }[] };
+import { downloadBlob, SAVE_TEXT, saveTagClass, SavepointsCard, useBulletinDraft } from '../../bulletin/draft';
 
 // Úvodní zpravodaj (M8): rosters and the schedule from chess.cz, venues / contacts / start-time exceptions from
 // the app, referees from the referee assignment page (read-only here). Only the draft config is stored (autosave +
 // named save points); DOCX / PDF are generated in the browser on download.
-export function Bulletin() {
+export function InitialBulletin() {
   const { data: detail } = useCompetition();
   const c = detail.competition;
   const qc = useQueryClient();
   const [progress, setProgress] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const stored = useQuery({ queryKey: ['bulletin', c.id, 'initial'], queryFn: () => api.get<Stored>(`/competitions/${c.id}/bulletins/initial`) });
+  const draft = useBulletinDraft(c.id, 'initial', normalizeConfig);
+  const { stored, cfg, update, error, setError } = draft;
+  const editorVersion = draft.version;
   const check = useQuery({ queryKey: ['roster-check', c.id], queryFn: () => api.get<RosterCheckData>(`/competitions/${c.id}/roster-check`) });
   const refsQ = useQuery({ queryKey: ['referees', c.id], queryFn: () => api.get<{ assignments: Record<string, string> }>(`/competitions/${c.id}/referees`) });
   const cz = useQuery({
@@ -35,42 +34,6 @@ export function Bulletin() {
     queryFn: () => loadChesscz(c.chesscz_comp_id, setProgress),
     staleTime: 10 * 60_000,
   });
-
-  // Draft config: local state, saved 800 ms after the last change.
-  const [cfg, setCfg] = useState<InitialConfig | null>(null);
-  const [editorVersion, setEditorVersion] = useState(0);
-  const [saveState, setSaveState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
-  const timer = useRef<number | undefined>(undefined);
-  const pending = useRef<InitialConfig | null>(null);
-  useEffect(() => {
-    if (stored.data && !cfg) setCfg(normalizeConfig(stored.data.config));
-  }, [stored.data, cfg]);
-
-  const save = async () => {
-    window.clearTimeout(timer.current);
-    const body = pending.current;
-    if (!body) return;
-    pending.current = null;
-    setSaveState('saving');
-    try {
-      await api.put(`/competitions/${c.id}/bulletins/initial`, { config: body });
-      setSaveState(pending.current ? 'dirty' : 'saved');
-    } catch (e) {
-      setSaveState('error');
-      setError(apiErrorText(e) ?? 'Uložení se nepodařilo');
-    }
-  };
-  const update = (fn: (c: InitialConfig) => InitialConfig) => {
-    setCfg((prev) => {
-      const next = fn(prev!);
-      pending.current = next;
-      return next;
-    });
-    setSaveState('dirty');
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(save, 800);
-  };
-  useEffect(() => () => { if (pending.current) void save(); }, []); // flush on leaving the page
 
   const assembled = useMemo(
     () => (cfg && cz.data && refsQ.data ? assemble(detail, check.data, cz.data, cfg, refsQ.data.assignments) : null),
@@ -87,11 +50,7 @@ export function Bulletin() {
     setError(null);
     try {
       const blob = kind === 'docx' ? await buildDocxBlob(model) : await buildPdfBlob(model);
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${model.fileName}.${kind}`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      downloadBlob(blob, `${model.fileName}.${kind}`);
     } catch (e) {
       setError(`${kind.toUpperCase()} se nepodařilo vytvořit: ${apiErrorText(e) ?? e}`);
     } finally {
@@ -99,27 +58,6 @@ export function Bulletin() {
     }
   };
 
-  const savepoint = async () => {
-    const label = window.prompt('Název save pointu (např. „před losováním“):', '');
-    if (label === null) return;
-    if (pending.current) await save();
-    else if (!stored.data?.updated_at) { pending.current = cfg; await save(); }
-    await api.post(`/competitions/${c.id}/bulletins/initial/savepoints`, { label });
-    await qc.invalidateQueries({ queryKey: ['bulletin', c.id, 'initial'] });
-  };
-  const restore = async (id: number, label: string) => {
-    if (!window.confirm(`Obnovit koncept ze save pointu „${label || 'bez názvu'}“? Současný stav se uloží jako save point „před obnovením“.`)) return;
-    if (pending.current) await save();
-    const r = await api.post<{ config: unknown }>(`/competitions/${c.id}/bulletins/initial/savepoints/${id}/restore`);
-    setCfg(normalizeConfig(r.config));
-    setEditorVersion((v) => v + 1);
-    await qc.invalidateQueries({ queryKey: ['bulletin', c.id, 'initial'] });
-  };
-  const removeSavepoint = async (id: number) => {
-    if (!window.confirm('Smazat save point?')) return;
-    await api.delete(`/competitions/${c.id}/bulletins/initial/savepoints/${id}`);
-    await qc.invalidateQueries({ queryKey: ['bulletin', c.id, 'initial'] });
-  };
   const reloadCz = async () => {
     // refresh=true bypasses the proxy cache for the competition's chess.cz data
     if (c.chesscz_comp_id) {
@@ -132,14 +70,13 @@ export function Bulletin() {
   };
 
   const av = assembled?.availability;
-  const saveText = { saved: 'uloženo', dirty: 'neuloženo…', saving: 'ukládám…', error: 'chyba ukládání' }[saveState];
 
   return (
     <>
       <div className="card">
         <div className="card-strip">
           <h2>Úvodní zpravodaj</h2>
-          <span className={`tag${saveState === 'error' ? ' bad' : saveState === 'saved' ? ' ok' : ''}`}>{saveText}</span>
+          <span className={saveTagClass(draft.saveState)}>{SAVE_TEXT[draft.saveState]}</span>
         </div>
         <div className="card-body">
           <div className="bulletin-bar">
@@ -195,7 +132,7 @@ export function Bulletin() {
                     </>
                   )}
                 </li>
-                <li><span className="tag">aplikace</span> Hrací místnosti, kontakty, schválené začátky utkání; rozhodčí z karty <Link to="../rozhodci">Nasazení rozhodčích</Link></li>
+                <li><span className="tag">aplikace</span> Hrací místnosti, kontakty, schválené začátky utkání; rozhodčí z karty <Link to="../rozhodci">Nominace rozhodčích</Link></li>
               </ul>
             )}
             {model && model.warnings.length > 0 && (
@@ -204,30 +141,7 @@ export function Bulletin() {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-strip"><h2>Save pointy konceptu</h2>
-            <button className="btn btn-small" onClick={savepoint}>Uložit save point</button>
-          </div>
-          <div className="card-body">
-            <p className="helper-text">Ukládá se jen koncept: texty, datum a volby. Rozhodčí jsou z karty Nasazení rozhodčích. Soupisky a rozlosování se vždy načtou aktuální z chess.cz, místnosti a kontakty z družstev.</p>
-            {stored.data?.savepoints.length ? (
-              <table className="table">
-                <tbody>
-                  {stored.data.savepoints.map((s) => (
-                    <tr key={s.id}>
-                      <td>{s.label || <span className="muted">bez názvu</span>}</td>
-                      <td className="muted">{czDateTime(s.created_at)}</td>
-                      <td className="req-actions">
-                        <button className="btn btn-small" onClick={() => restore(s.id, s.label)}>Obnovit</button>
-                        <button className="icon-btn" title="Smazat" onClick={() => removeSavepoint(s.id)}>✕</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <p className="muted">Zatím žádné save pointy.</p>}
-          </div>
-        </div>
+        <SavepointsCard draft={draft} hint="Ukládá se jen koncept: texty, datum a volby. Rozhodčí jsou z karty Nominace rozhodčích. Soupisky a rozlosování se vždy načtou aktuální z chess.cz, místnosti a kontakty z družstev." />
       </div>
 
       {!model ? (
@@ -334,7 +248,7 @@ function SectionView({ s, cfg, update, version }: {
                     <td className="c">{m.board}</td><td className="c">{m.homeStc}</td>
                     <td>{m.homeName}{m.time && <span className="tm"> {m.time}{m.time === CONFLICT ? '' : ' hodin'}</span>}</td>
                     <td className="c">-</td><td>{m.awayName}</td><td className="c">{m.awayStc}</td>
-                    {s.withRef && <td title="Rozhodčí se mění na kartě Nasazení rozhodčích">{m.ref || <span className="d-missing">nenasazen</span>}</td>}
+                    {s.withRef && <td title="Rozhodčí se mění na kartě Nominace rozhodčích">{m.ref || <span className="d-missing">nenominován</span>}</td>}
                   </tr>
                 ))}
               </tbody></table>

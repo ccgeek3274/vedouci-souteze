@@ -264,7 +264,7 @@ textarea.input { height: auto; min-height: 88px; padding: 10px 12px; }
 [data-skin="chess"] .tag { font: 700 11px var(--sans); letter-spacing: 0.02em; }
 [data-skin="chess"] .chip { font: 700 12px var(--sans); }
 
-/* Nasazení rozhodčích + veřejný rozpis */
+/* Nominace rozhodčích + veřejný rozpis */
 .ref-rounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 18px; }
 .ref-table td { padding: 5px 8px; }
 .ref-cell { width: 42%; }
@@ -358,3 +358,49 @@ table.pub-current { outline: 2px solid var(--danger); outline-offset: -1px; }
 @media (max-width: 720px) {
   .source-list .confirm, .source-list .muted { margin-left: 0; }
 }
+
+/* Zpravodaj: switcher úvodní / kola (chip of the bulletin picked by today's date outlined) */
+.bsw { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.bsw .chip { text-decoration: none; height: auto; padding: 4px 9px; gap: 6px; }
+.bsw .chip.bsw-auto:not(.active) { border-color: var(--ink); }
+.bsw-date { font-weight: 400; opacity: .75; }
+.bsw-saved { color: var(--ok); font-size: 15px; line-height: 1; }
+.chip.active .bsw-saved { color: inherit; }
+
+/* Zpravodaj z kola (M9): preview 1:1 with the DOCX — 1 px = 15 DXA, pt × 4/3 = px (sscr-zpravodaj) */
+.rdoc { width: 794px; margin: 0 auto; background: #fff; color: #000; box-shadow: 0 2px 14px rgba(0,0,0,.35);
+  font-family: DocFont, Calibri, Carlito, sans-serif; line-height: 1.22; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.rdoc-top { box-sizing: border-box; }
+.rdoc-hdr { display: flex; justify-content: space-between; gap: 12px; white-space: nowrap; line-height: 1.22; }
+.rdoc-hdr span { overflow: hidden; text-overflow: ellipsis; }
+.rdoc-hdr span:first-child:empty { flex: 1; }
+.rdoc-hdr .c { flex: 1; text-align: center; }
+.rdoc-h { font-weight: 700; margin: 13.33px 0 5.33px; }
+.rdoc-h.first { margin-top: 4px; }
+.rdoc table { border-collapse: collapse; table-layout: fixed; line-height: 1.2; }
+.rdoc table.rdoc-res { margin-bottom: 17.9px; } /* = one empty 11 pt line (DOCX gap) */
+.rdoc table.rdoc-res:last-of-type { margin-bottom: 0; }
+.rdoc td, .rdoc th { border: 1px solid #aaa; padding: 1.6px 6px; vertical-align: middle; overflow: hidden; overflow-wrap: anywhere; font-weight: 400; }
+.rdoc .c { text-align: center; } .rdoc .r { text-align: right; } .rdoc .l { text-align: left; }
+.rdoc tr.mh td { background: #c8d9f0; font-weight: 700; padding-top: 1px; padding-bottom: 1px; }
+.rdoc .rdoc-stand th { background: #c8d9f0; font-weight: 700; }
+.rdoc .rdoc-stand tbody tr:nth-child(even) td { background: #f2f2f2; }
+.rdoc-ref { width: 16em; border: none; background: #fff6cc; box-shadow: inset 0 -1px 0 #c9a227; font: inherit; padding: 0 2px; color: inherit; }
+.rdoc-ref:focus { outline: none; background: #ffeb99; }
+.rdoc-ref.changed { background: #ffe0a3; }
+.rdoc-ref::placeholder { color: #b00; font-style: italic; }
+.rdoc-undo { border: none; background: none; cursor: pointer; color: #8a6d1d; font-size: 0.95em; padding: 0 4px; }
+.rdoc-pick { display: inline-flex; align-items: baseline; }
+.rdoc-drop { border: none; background: none; cursor: pointer; color: #8a6d1d; font-size: 0.85em; padding: 0 3px; }
+.ref-menu { position: fixed; z-index: 50; margin: 0; padding: 4px 0; list-style: none; background: var(--field-bg); color: var(--ink);
+  border: 1px solid var(--divider); box-shadow: 0 4px 16px rgba(0,0,0,.25); max-height: 320px; overflow-y: auto; font-size: 13px; }
+.ref-menu-h { padding: 4px 10px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.ref-menu-sep { border-top: 1px solid var(--divider); margin: 4px 0; }
+.ref-menu-none { padding: 2px 10px 4px; color: var(--muted); font-style: italic; }
+.ref-menu button { display: flex; justify-content: space-between; gap: 16px; width: 100%; border: none; background: none; font: inherit;
+  color: inherit; text-align: left; padding: 3px 10px; cursor: pointer; }
+.ref-menu button:hover, .ref-menu button.on { background: #ffeb99; color: #000; }
+.ref-menu button span { color: var(--muted); font-size: 11px; }
+.rdoc .d-rich { margin-top: 2px; }
+.rdoc .rich-editor .ql-editor { font-size: inherit; padding: 4px 6px; }
+.rdoc .rich-editor .ql-editor p, .rdoc .rich-editor .ql-editor li { margin: 0 0 6.67px; }

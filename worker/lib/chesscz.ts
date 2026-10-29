@@ -13,7 +13,7 @@ const H = 3600 * 1000;
 const ROUTES: { re: RegExp; ttl: number }[] = [
   { re: /^\/competitions(\/\d{4})?$/, ttl: 24 * H },
   { re: /^\/competitions\/\d+\/(details|schedule|crosstable)$/, ttl: 24 * H },
-  { re: /^\/competitions\/\d+\/table$/, ttl: 1 * H },
+  { re: /^\/competitions\/\d+\/table$/, ttl: H / 6 }, // standings change with the round results (zpravodaj z kola)
   { re: /^\/competitions\/\d+\/round\/\d+\/schedule$/, ttl: 24 * H },
   { re: /^\/competitions\/\d+\/round\/\d+\/matches$/, ttl: H / 6 },
   { re: /^\/competitions\/\d+\/team\/\d+\/(roster|schedule|contacts)$/, ttl: 1 * H },

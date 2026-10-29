@@ -181,7 +181,7 @@ export function buildPdfDef(model: BulletinModel): any {
 }
 
 let pdfReady: Promise<any> | null = null;
-function loadPdfMake(): Promise<any> {
+export function loadPdfMake(): Promise<any> {
   if (!pdfReady) {
     pdfReady = import('pdfmake/build/pdfmake').then((m: any) => {
       const pdfMake = m.default ?? m;

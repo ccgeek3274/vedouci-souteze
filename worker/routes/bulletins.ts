@@ -3,7 +3,7 @@ import { authRequired } from '../middleware/auth';
 import { now, ownedCompetition } from '../lib/db';
 import type { AppEnv } from '../types';
 
-// Bulletin drafts (M8/M9): the config JSON (texts, referees, options) and its save points.
+// Bulletin drafts (M8/M9): the config JSON (texts, options) and its save points.
 // The documents themselves are generated in the browser from chess.cz + app data and never stored.
 const bulletins = new Hono<AppEnv>();
 bulletins.use('*', authRequired);
@@ -23,6 +23,28 @@ async function target(c: Ctx) {
 const parse = (s: string | null | undefined) => {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
 };
+
+/**
+ * A save point = the draft config + optionally `snapshot` (data frozen only in save points, e.g. the standings and
+ * referees of a zpravodaj z kola). The draft itself never keeps a snapshot.
+ */
+const withSnapshot = (config: string, snapshot: unknown) =>
+  snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) ? JSON.stringify({ ...parse(config), snapshot }) : config;
+const withoutSnapshot = (config: string) => {
+  const o = parse(config);
+  if (!o || typeof o !== 'object' || !('snapshot' in o)) return config;
+  const { snapshot: _, ...rest } = o;
+  return JSON.stringify(rest);
+};
+
+// Keys of the stored drafts (the bulletin switcher marks them).
+bulletins.get('/competitions/:id/bulletins', async (c) => {
+  const comp = await ownedCompetition(c, c.req.param('id') ?? '');
+  if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
+  const { results } = await c.env.DB.prepare('SELECT key, updated_at FROM bulletins WHERE competition_id = ? ORDER BY key')
+    .bind(comp.id).all<{ key: string; updated_at: number }>();
+  return c.json({ bulletins: results });
+});
 
 bulletins.get('/competitions/:id/bulletins/:key', async (c) => {
   const t = await target(c);
@@ -50,24 +72,28 @@ bulletins.put('/competitions/:id/bulletins/:key', async (c) => {
   return c.json({ ok: true, updated_at: ts });
 });
 
-// Save point = copy of the current saved config under a label.
+// Save point = copy of the current saved config under a label (+ the snapshot sent by the page).
 bulletins.post('/competitions/:id/bulletins/:key/savepoints', async (c) => {
   const t = await target(c);
   if (!t) return c.json({ error: 'Zpravodaj nenalezen' }, 404);
-  const b = await c.req.json<{ label?: unknown }>().catch(() => ({} as { label?: unknown }));
+  const b = await c.req.json<{ label?: unknown; snapshot?: unknown }>().catch(() => ({} as { label?: unknown; snapshot?: unknown }));
   const row = await c.env.DB.prepare('SELECT config FROM bulletins WHERE competition_id = ? AND key = ?')
     .bind(t.comp.id, t.key).first<{ config: string }>();
   if (!row) return c.json({ error: 'Koncept zatím není uložen' }, 400);
   const label = String(b?.label ?? '').trim().slice(0, 100);
+  const config = withSnapshot(row.config, b?.snapshot);
+  if (config.length > MAX_CONFIG) return c.json({ error: 'Save point je příliš velký' }, 413);
   const r = await c.env.DB.prepare('INSERT INTO bulletin_savepoints (competition_id, key, label, config, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(t.comp.id, t.key, label, row.config, now()).run();
+    .bind(t.comp.id, t.key, label, config, now()).run();
   return c.json({ ok: true, id: r.meta.last_row_id });
 });
 
-// Restore: the current config is kept as an automatic save point first, so a restore can be undone.
+// Restore: the current config is kept as an automatic save point first (with the snapshot of what the page shows now),
+// so a restore can be undone. The draft gets the config without the snapshot; the page takes it from the response.
 bulletins.post('/competitions/:id/bulletins/:key/savepoints/:sp/restore', async (c) => {
   const t = await target(c);
   if (!t) return c.json({ error: 'Zpravodaj nenalezen' }, 404);
+  const b = await c.req.json<{ snapshot?: unknown }>().catch(() => ({} as { snapshot?: unknown }));
   const sp = await c.env.DB.prepare('SELECT config, label, created_at FROM bulletin_savepoints WHERE id = ? AND competition_id = ? AND key = ?')
     .bind(Number(c.req.param('sp')), t.comp.id, t.key).first<{ config: string; label: string; created_at: number }>();
   if (!sp) return c.json({ error: 'Save point nenalezen' }, 404);
@@ -75,14 +101,16 @@ bulletins.post('/competitions/:id/bulletins/:key/savepoints/:sp/restore', async 
     .bind(t.comp.id, t.key).first<{ config: string }>();
   const ts = now();
   const stmts = [];
-  if (cur && cur.config !== sp.config) {
+  const draft = withoutSnapshot(sp.config);
+  const backup = cur ? withSnapshot(cur.config, b?.snapshot) : null;
+  if (backup && backup !== sp.config && backup.length <= MAX_CONFIG) {
     stmts.push(c.env.DB.prepare('INSERT INTO bulletin_savepoints (competition_id, key, label, config, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(t.comp.id, t.key, 'před obnovením', cur.config, ts));
+      .bind(t.comp.id, t.key, 'před obnovením', backup, ts));
   }
   stmts.push(c.env.DB.prepare(
     `INSERT INTO bulletins (competition_id, key, config, updated_at) VALUES (?, ?, ?, ?)
      ON CONFLICT (competition_id, key) DO UPDATE SET config = excluded.config, updated_at = excluded.updated_at`
-  ).bind(t.comp.id, t.key, sp.config, ts));
+  ).bind(t.comp.id, t.key, draft, ts));
   await c.env.DB.batch(stmts);
   return c.json({ ok: true, config: parse(sp.config), updated_at: ts });
 });
