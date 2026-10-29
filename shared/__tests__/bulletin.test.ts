@@ -82,7 +82,7 @@ describe('model', () => {
     expect(rounds[2].rows[0].time).toBe('');
     expect(m.warnings.some((w) => w.includes('posledním kole'))).toBe(true);
     expect(m.warnings).toContain('Tým c: chybí soupiska');
-    expect(m.warnings).toContain('Utkání bez nasazeného rozhodčího: 1 (karta Nasazení rozhodčích)');
+    expect(m.warnings).toContain('Utkání bez nominovaného rozhodčího: 1 (karta Nominace rozhodčích)');
     expect(m.subtitles[1]).toBe('Předběžný úvodní zpravodaj – ročník 2026/2027');
     expect(m.fileName).toBe('rpb_26_27_uz_predbezny');
     const ann = m.chapters.find((c) => c.title === 'Další oznámení')!.sections[0] as any;

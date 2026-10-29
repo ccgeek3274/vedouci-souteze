@@ -36,6 +36,7 @@ Zadání: `doc/vedouci_podklady.md`, produktová specifikace: `doc/PRD.md`.
   záložkami soutěže používej `../t/…`.
 - Web nesmí importovat z `worker/` (typy Workers) — sdílené typy patří do `shared/`.
 - Název družstva v UI soutěže vždy přes `web/src/components/TeamName.tsx` (ikona → soupiska družstva, absolutní cesta).
+  Výjimka: karta Nominace rozhodčích (jen názvy, bez odkazů).
 - Párování názvů družstev: `teamNameScore` (`shared/text.ts`) — různá písmena družstev (D/E) se nikdy nespárují.
 
 ## chess.cz API

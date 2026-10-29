@@ -42,7 +42,7 @@ export function CompetitionLayout() {
         <NavLink to="kontrola">Kontrola soupisek</NavLink>
         <NavLink to="pozadavky">Požadavky{newRequests ? ` (${newRequests})` : ''}</NavLink>
         <NavLink to="losovani">Losování</NavLink>
-        <NavLink to="rozhodci">Nasazení rozhodčích</NavLink>
+        <NavLink to="rozhodci">Nominace rozhodčích</NavLink>
         <NavLink to="swiss-manager">Swiss-Manager</NavLink>
         <NavLink to="zpravodaj">Zpravodaj</NavLink>
       </nav>

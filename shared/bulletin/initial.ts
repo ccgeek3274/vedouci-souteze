@@ -70,7 +70,7 @@ export type BulletinData = {
   teams: BTeam[]; // in start-number order
   rosters: Record<string, BPlayer[] | null>; // by team key; null = no roster
   rounds: BRound[];
-  refs: Record<string, string>; // refKey → assigned referee (karta Nasazení rozhodčích)
+  refs: Record<string, string>; // refKey → assigned referee (karta Nominace rozhodčích)
   deficiencies: { team: string; lines: string[] }[]; // preliminary bulletin: roster check findings
   sameClub: [string, string][]; // team keys of same-club pairs
   warnings: string[];
@@ -305,7 +305,7 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
   });
   if (cfg.withRef) {
     const noRef = rounds.reduce((n, r) => n + r.rows.filter((m) => !m.ref.trim()).length, 0);
-    if (noRef) warnings.push(`Utkání bez nasazeného rozhodčího: ${noRef} (karta Nasazení rozhodčích)`);
+    if (noRef) warnings.push(`Utkání bez nominovaného rozhodčího: ${noRef} (karta Nominace rozhodčích)`);
   }
 
   const exceptions = exceptionLines(data);
