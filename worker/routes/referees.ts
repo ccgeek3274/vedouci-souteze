@@ -10,7 +10,7 @@ referees.use('*', authRequired);
 
 const KEY_RE = /^(\d{1,2}):([\w:-]{1,64})$/;
 const MAX_ASSIGNMENTS = 500;
-const SOURCES = ['manual', 'auto', 'clear', 'restore'] as const;
+const SOURCES = ['manual', 'auto', 'clear', 'restore', 'names'] as const;
 
 type Assignments = Record<string, string>;
 const sameMap = (a: Assignments, b: Assignments) => {

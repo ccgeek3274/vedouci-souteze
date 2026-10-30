@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competitionSchedule, currentRoundNr, pairCzTeams, rotatedReferees, sameName, scheduleRounds, type SchedAppTeam } from '../schedule';
+import { competitionSchedule, currentRoundNr, pairCzTeams, respelledReferees, rotatedReferees, sameName, scheduleRounds, type SchedAppTeam } from '../schedule';
 
 const app = (id: string, name: string, draw_no: number | null, extra: Partial<SchedAppTeam> = {}): SchedAppTeam =>
   ({ id, name, chesscz_team_id: null, draw_no, position: draw_no ?? 0, club_code: null, club_name: '', ...extra });
@@ -55,5 +55,20 @@ describe('schedule', () => {
     expect(currentRoundNr(rounds, '2026-10-11')).toBe(1);
     expect(currentRoundNr(rounds, '2026-10-12')).toBe(2);
     expect(currentRoundNr(rounds, '2026-11-09')).toBe(null);
+  });
+});
+
+describe('respelledReferees', () => {
+  const teams = [
+    { key: 'a', contacts: [{ role: 'kapitan', name: 'Kryšpín Libor' }, { role: 'rozhodci', name: 'Eliáš Jakub' }] },
+    { key: 'cz:7', contacts: [{ role: 'rozhodci', name: 'Novák Jan' }] },
+  ];
+  it('takes the spelling of the contacts, keeps who referees', () => {
+    const r = respelledReferees({ '1:a': 'Libor Kryšpín', '2:a': 'Eliáš Jakub', '3:cz:7': 'Jan Novak', '4:a': 'Jan Novák', '5:a': 'Cizí Pan', '6:a': '' }, teams);
+    expect(r.next).toEqual({ '1:a': 'Kryšpín Libor', '2:a': 'Eliáš Jakub', '3:cz:7': 'Novák Jan', '4:a': 'Novák Jan', '5:a': 'Cizí Pan', '6:a': '' });
+    expect(r.changes).toEqual([{ from: 'Libor Kryšpín', to: 'Kryšpín Libor' }, { from: 'Jan Novak', to: 'Novák Jan' }, { from: 'Jan Novák', to: 'Novák Jan' }]);
+  });
+  it('changes nothing when the names match', () => {
+    expect(respelledReferees({ '1:a': 'Eliáš Jakub' }, teams).changes).toEqual([]);
   });
 });

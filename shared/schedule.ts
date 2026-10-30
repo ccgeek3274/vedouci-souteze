@@ -134,3 +134,25 @@ export function sameName(a: string, b: string): boolean {
   const norm = (s: string) => fold(s).split(/[^a-z0-9]+/).filter(Boolean).sort().join(' ');
   return norm(a) !== '' && norm(a) === norm(b);
 }
+
+/**
+ * Nominated referees written otherwise than in the contacts (word order, diacritics, case — e.g. after fixing
+ * a contact on Kontrola soupisek) → the contact's spelling. The home team's contacts first, then any team's.
+ * Only the spelling changes, never who referees the match.
+ */
+export function respelledReferees(assignments: Record<string, string>, teams: RefTeam[]): { next: Record<string, string>; changes: { from: string; to: string }[] } {
+  const names = (t: RefTeam | undefined) => (t?.contacts ?? []).map((c) => c.name.trim()).filter(Boolean);
+  const all = teams.flatMap(names);
+  const next = { ...assignments };
+  const changes: { from: string; to: string }[] = [];
+  for (const [key, value] of Object.entries(assignments)) {
+    const v = value.trim();
+    if (!v) continue;
+    const home = teams.find((t) => refKey(Number(key.split(':')[0]), t.key) === key);
+    const to = [...names(home), ...all].find((n) => sameName(n, v));
+    if (!to || to === v) continue;
+    next[key] = to;
+    if (!changes.some((c) => c.from === v && c.to === to)) changes.push({ from: v, to });
+  }
+  return { next, changes };
+}

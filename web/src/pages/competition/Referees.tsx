@@ -4,17 +4,17 @@ import { api, apiErrorText } from '../../lib/api';
 import { czDate, czDateTime } from '../../lib/format';
 import { useCompetition } from './CompetitionLayout';
 import { loadChesscz } from '../../bulletin/load';
-import { competitionSchedule, refKey, rotatedReferees, sameName, scheduleRounds, teamReferees } from '../../../../shared/schedule';
+import { competitionSchedule, refKey, respelledReferees, rotatedReferees, sameName, scheduleRounds, teamReferees } from '../../../../shared/schedule';
 import { CONFLICT } from '../../../../shared/bulletin/initial';
 
 type Assignments = Record<string, string>;
-type Source = 'manual' | 'auto' | 'clear' | 'restore';
+type Source = 'manual' | 'auto' | 'clear' | 'restore' | 'names';
 type Version = { version: number; source: Source; created_at: number; count: number };
 type RefsResponse = {
   assignments: Assignments; version: number; versions: Version[];
   initialSavepoints: { count: number; last: { label: string; created_at: number } | null };
 };
-const SOURCE_LABEL: Record<Source, string> = { manual: 'ruční úprava', auto: 'automatická nominace', clear: 'smazání', restore: 'obnovení verze' };
+const SOURCE_LABEL: Record<Source, string> = { manual: 'ruční úprava', auto: 'automatická nominace', clear: 'smazání', restore: 'obnovení verze', names: 'aktualizace jmen' };
 
 // Nominace rozhodčích: one referee per match. Read-only by default; Upravit → edit (automatic rotation of the home
 // team's referees, manual edits) → Uložit creates a new version (history as with the rosters). The bulletins take
@@ -113,6 +113,15 @@ export function Referees() {
     const rot = rotatedReferees({ teams: sched.teams.map((t) => ({ key: t.key, contacts: t.app?.contacts ?? [] })), rounds: sched.rounds });
     setRefs(Object.fromEntries(rot), 'auto');
   };
+  // names written otherwise than in the contacts (e.g. fixed on Kontrola soupisek) — spelling only, same referees
+  const respell = respelledReferees(st.assignments, sched
+    ? sched.teams.map((t) => ({ key: t.key, contacts: t.app?.contacts ?? [] }))
+    : active.map((t) => ({ key: t.id, contacts: t.contacts })));
+  const updateNames = async () => {
+    const list = respell.changes.map((x) => `${x.from} → ${x.to}`).join('\n');
+    if (!ask(`Přepsat jména v nominacích podle kontaktů družstev? Kdo píská které utkání, se nezmění.\n\n${list}`)) return;
+    await put(respell.next, 'names', st.version);
+  };
   const clearAll = () => {
     if (ask('Smazat všechny nominované rozhodčí?')) setRefs({}, 'clear');
   };
@@ -175,6 +184,13 @@ export function Referees() {
               )}
             </div>
             {spWarning && (editing || viewingOld) && <div className="warn">! {spWarning}</div>}
+            {!editing && !viewingOld && respell.changes.length > 0 && (
+              <div className="warn">
+                ! {respell.changes.length === 1 ? 'Jedno jméno je v nominacích zapsáno' : respell.changes.length < 5 ? `${respell.changes.length} jména jsou v nominacích zapsána` : `${respell.changes.length} jmen je v nominacích zapsáno`} jinak než v kontaktech družstev:
+                {' '}{respell.changes.map((x) => `${x.from} → ${x.to}`).join(', ')}.{' '}
+                <button className="btn btn-small" disabled={saving} onClick={updateNames}>Aktualizovat jména podle kontaktů</button>
+              </div>
+            )}
             {viewingOld && <div className="warn">! Zobrazena starší verze {viewVersion} — jen ke čtení. Aktuální je verze {st.version}.</div>}
             <p className="helper-text">
               {editing ? <>

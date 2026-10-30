@@ -46,3 +46,11 @@
 - API `GET /api/v1/public/competitions/:id` (bez auth; 404, není-li zveřejněno). chess.cz přes cache proxy
   s rate-limitem, `Cache-Control: max-age=60`. Route musí být v `worker/index.ts` před routami na `/`, jejich
   `authRequired` na `*` by jinak chytal i `/public/*`.
+
+## Jména podle kontaktů (30. 10. 2026)
+Nominace ukládají jména jako text — oprava kontaktu (např. *opravit na …* na Kontrole soupisek) se do nich **automaticky
+nepromítne**. Karta proto porovná nominované se jmény v kontaktech (`respelledReferees`, `shared/schedule.ts`: stejné
+jméno podle `sameName`, jiný zápis — pořadí slov, diakritika, velikost písmen, interpunkce; nejdřív kontakty domácích,
+pak ostatních družstev) a ukáže varování s tlačítkem **Aktualizovat jména podle kontaktů**. Uložení = nová verze se
+zdrojem `names` („aktualizace jmen“); mění se jen zápis jmen, kdo píská které utkání, zůstává. Při save pointu
+úvodního zpravodaje se ptá jako ostatní změny. Jen v zobrazení aktuální verze (ne při úpravě / staré verzi).
