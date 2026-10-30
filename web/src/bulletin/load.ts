@@ -87,7 +87,7 @@ export function assemble(detail: CompetitionDetail, check: RosterCheckData | und
       const players = appPlayers(t.key) ?? [];
       const lines = players.flatMap((p) => {
         if (p.struck) return [`${p.name}: bude vyškrtnut${p.struck_reason ? ` — ${p.struck_reason}` : ''}`];
-        const list = (issues.get(p.id) ?? []).filter((i) => i.level === 'bad' || i.strike);
+        const list = (issues.get(p.id) ?? []).filter((i) => !i.accepted && (i.level === 'bad' || i.strike));
         if (!list.length) return [];
         const strike = strikeReason(list);
         return [`${p.name}: ${list.map((i) => i.text).join('; ')}${strike ? ' (k vyškrtnutí)' : ''}`];

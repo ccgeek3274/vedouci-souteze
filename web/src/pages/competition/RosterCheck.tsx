@@ -4,7 +4,7 @@ import { api, apiErrorText } from '../../lib/api';
 import { czDateTime } from '../../lib/format';
 import { checkTeamRoster, checkedAt, chessczGet, competitionIssues, prepareCheck, runVCheck } from '../../lib/rosterCheck';
 import type { RosterCheckData, RosterPlayer } from '../../lib/types';
-import { asArray, deficiencyReport, strikeReason, type Issue } from '../../../../shared/roster/verify';
+import { asArray, deficiencyReport, strikeReason, toggleAccepted, type Issue } from '../../../../shared/roster/verify';
 import { sameCompetition, type RosterCheckSection } from '../../../../shared/registry';
 import { fold } from '../../../../shared/text';
 import { flagParts } from '../../../../shared/roster/draft';
@@ -61,7 +61,8 @@ export function RosterCheck() {
 
   const all = withRoster.flatMap((t) => t.players!);
   const unchecked = all.filter((p) => !p.cz).length;
-  const bad = all.filter((p) => !p.struck && (issues.get(p.id) ?? []).some((i) => i.level === 'bad')).length;
+  const bad = all.filter((p) => !p.struck && (issues.get(p.id) ?? []).some((i) => i.level === 'bad' && !i.accepted)).length;
+  const accepted = all.filter((p) => !p.struck && (issues.get(p.id) ?? []).some((i) => i.accepted)).length;
   const toStrike = all.filter((p) => !p.struck && strikeReason(issues.get(p.id) ?? [])).length;
   const report = deficiencyReport(withRoster.map((t) => ({ name: t.name, players: t.players!.map((p) => ({ ...p, issues: issues.get(p.id) ?? [] })) })));
 
@@ -77,11 +78,13 @@ export function RosterCheck() {
             {unchecked > 0 && <> · <span className="tag warn">{unchecked} neověřeno</span></>}
             {' · '}{bad ? <span className="tag bad">{bad} s nedostatky</span> : <span className="tag ok">bez nedostatků</span>}
             {toStrike > 0 && <> · <span className="tag bad">{toStrike} navrženo k vyškrtnutí</span></>}
+            {accepted > 0 && <> · <span className="tag">{accepted} s odsouhlaseným nedostatkem</span></>}
           </p>
           <p className="helper-text">
             Před definitivním úvodním zpravodajem se vyškrtnou hráči bez registrace a hosté bez povolení hostování (rozpis).
             Z se kontroluje podle pravidla e-soupisky ({c.boards} hráčů, nejvýše {Math.max(0, Math.ceil(c.boards / 2) - 1)} písmenkoví H/V/C),
             hostování a cizinci podle registrů ŠSČR (hostovani / registracecizincu.appchess.cz). Označení V má samostatnou kontrolu níže.
+            Každý nález lze <b>odsouhlasit</b> (✓) — pak se nepočítá jako nedostatek, nenavrhuje vyškrtnutí a nejde do zpravodaje.
             Kontrola volá chess.cz postupně (~3 dotazy/s), u celé skupiny trvá asi minutu.
           </p>
           <div className="row">
@@ -146,10 +149,19 @@ function TeamCheck({ team, issues, busy, onCheck, onChanged }: {
   );
 }
 
-export function IssueList({ issues }: { issues: Issue[] }) {
+/** Findings of a player; with `onToggle` each one can be accepted manually (and the acceptance taken back). */
+export function IssueList({ issues, onToggle }: { issues: Issue[]; onToggle?: (text: string) => void }) {
   return (
     <div className="issues">
-      {issues.map((i) => <div key={i.text} className={i.level}>{i.level === 'bad' ? '✕' : '!'} {i.text}</div>)}
+      {issues.map((i) => (
+        <div key={i.text} className={i.accepted ? 'accepted' : i.level}>
+          {i.accepted ? '✓' : i.level === 'bad' ? '✕' : '!'} {i.text}{i.accepted && <span className="muted"> — odsouhlaseno</span>}
+          {onToggle && (
+            <button className="issue-acc" title={i.accepted ? 'Zrušit odsouhlasení' : 'Odsouhlasit — nepočítat jako nedostatek, nedávat do zpravodaje'}
+              onClick={() => onToggle(i.text)}>{i.accepted ? 'zrušit' : 'odsouhlasit'}</button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -160,13 +172,14 @@ const flagText = (p: RosterPlayer) => { const f = flagParts(p.flags); return [p.
 function IssueRow({ player: p, issues, onChanged }: { player: RosterPlayer; issues: Issue[]; onChanged: () => Promise<unknown> }) {
   const reason = strikeReason(issues);
   const candidate = p.cz?.status === 'no_id' && p.cz.candidates?.length === 1 ? p.cz.candidates[0] : null;
-  const patch = async (body: Partial<RosterPlayer>) => { await api.patch(`/roster-players/${p.id}`, body); await onChanged(); };
+  const patch = async (body: Partial<RosterPlayer> | { accepted_issues: string[] }) => { await api.patch(`/roster-players/${p.id}`, body); await onChanged(); };
   return (
     <tr className={p.struck ? 'struck' : undefined}>
       <td className="mono muted" style={{ width: 36 }}>{p.position}.</td>
       <td style={{ width: 220, fontWeight: 600 }}>{p.name}<div className="muted mono" style={{ fontSize: 12, fontWeight: 400 }}>{p.lok ? `LOK ${p.lok}` : 'bez LOK'}{flagText(p) && ` · ${flagText(p)}`}</div></td>
       <td>
-        {p.struck ? <div className="issues"><div className="bad">vyškrtnut{p.struck_reason && `: ${p.struck_reason}`}</div></div> : <IssueList issues={issues} />}
+        {p.struck ? <div className="issues"><div className="bad">vyškrtnut{p.struck_reason && `: ${p.struck_reason}`}</div></div>
+          : <IssueList issues={issues} onToggle={(text) => patch({ accepted_issues: toggleAccepted(issues, text) })} />}
       </td>
       <td className="actions" style={{ width: 170 }}>
         {candidate?.czeId && !p.struck && (

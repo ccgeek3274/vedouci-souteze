@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expectedBase, lookupRoster, playerIssues, registryRows, sameName, strikeReason, type CheckPlayer, type CzCheck, type CzMember } from '../roster/verify';
+import { deficiencyReport, expectedBase, lookupRoster, playerIssues, registryRows, sameName, strikeReason, toggleAccepted, withAccepted, type CheckPlayer, type CzCheck, type CzMember } from '../roster/verify';
 import { sameCompetition, type HostingRow } from '../registry';
 
 const member = (over: Partial<CzMember> & Record<string, unknown>) => ({
@@ -161,5 +161,23 @@ describe('parseZCell', () => {
     expect(parseZCell('x')).toEqual({ z: true, unusual: true });
     expect(parseZCell('ne')).toEqual({ z: false, unusual: true });
     expect(parseZCell('st.')).toEqual({ z: false, unusual: true });
+  });
+});
+
+describe('accepted findings', () => {
+  const issues = [
+    { level: 'bad' as const, text: 'bez platné registrace v ŠSČR (Neaktivní)', strike: true },
+    { level: 'warn' as const, text: 'rok narození na chess.cz 1990' },
+  ];
+  it('an accepted finding is no deficiency, no strike reason, not in the report', () => {
+    const acc = withAccepted(issues, ['bez platné registrace v ŠSČR (Neaktivní)']);
+    expect(acc[0].accepted).toBe(true);
+    expect(strikeReason(acc)).toBe('');
+    expect(deficiencyReport([{ name: 'T', players: [{ name: 'P', issues: acc }] }])).toBe('');
+    expect(deficiencyReport([{ name: 'T', players: [{ name: 'P', issues }] }])).toContain('P: bez platné registrace');
+  });
+  it('toggling keeps only texts still found', () => {
+    expect(toggleAccepted(issues, issues[1].text)).toEqual([issues[1].text]);
+    expect(toggleAccepted(withAccepted(issues, [issues[0].text, 'stará zpráva']), issues[0].text)).toEqual([]);
   });
 });

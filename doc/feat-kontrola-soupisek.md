@@ -67,6 +67,11 @@ vyškrtnutím (párování LOK, bez LOK jméno). Změna LOK/FIDE snapshot zahod�
 
 ## Výstup
 - Nedostatky (✕) a upozornění (!) u hráčů; vyškrtnutí vždy ručně (jednotlivě / „Vyškrtnout navržené“), lze vrátit.
+- **Odsouhlasení nálezu** (rozhodnutí 30. 10. 2026): u každého nálezu (✕ i !) tlačítko *odsouhlasit* na Kontrole
+  soupisek i v detailu družstva. Odsouhlasený nález je šedě s ✓, nepočítá se do „s nedostatky“, nenavrhuje vyškrtnutí
+  a nejde do zpravodaje; *zrušit* ho vrátí. Uloženo u hráče `roster_players.accepted_issues` (JSON pole textů nálezů,
+  migrace 0016), přenáší se do nové verze soupisky. Párování podle textu: když se nález změní (jiný oddíl, soutěž…),
+  je třeba ho odsouhlasit znovu; při přepnutí se texty, které už kontrola nehlásí, zahodí (`toggleAccepted`).
 - „Nedostatky pro předběžný zpravodaj“ = text po družstvech (`deficiencyReport`): nedostatky + vše, co vede
   k návrhu na vyškrtnutí — v M8 se vloží do zpravodaje.
 

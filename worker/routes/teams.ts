@@ -53,7 +53,7 @@ teams.get('/teams/:teamId', async (c) => {
   const chosen = (versions.results as any[]).find((v) => String(v.version) === version) ?? versions.results[0];
   const players = chosen
     ? (await db.prepare('SELECT * FROM roster_players WHERE roster_version_id = ? ORDER BY position').bind((chosen as any).id).all<any>()).results
-      .map(({ cz_json, v_json, ...p }) => ({ ...p, cz: cz_json ? JSON.parse(cz_json) : null, v: v_json ? JSON.parse(v_json) : null }))
+      .map(({ cz_json, v_json, accepted_issues, ...p }) => ({ ...p, cz: cz_json ? JSON.parse(cz_json) : null, v: v_json ? JSON.parse(v_json) : null, accepted: parseAccepted(accepted_issues) }))
     : [];
   return c.json({ team, contacts: contacts.results, versions: versions.results, roster: chosen ? { ...(chosen as object), players } : null });
 });
@@ -110,7 +110,15 @@ teams.put('/teams/:teamId/contacts', async (c) => {
   return c.json({ ok: true });
 });
 
-// Mark a player of the current roster (guest permit / struck) or fix his ids — M6 verification.
+/** Accepted roster check findings (issue texts) — stored as a JSON array. */
+function parseAccepted(s: unknown): string[] {
+  try {
+    const a = JSON.parse(String(s ?? '[]'));
+    return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [];
+  } catch { return []; }
+}
+
+// Mark a player of the current roster (guest permit / struck / accepted findings) or fix his ids — M6 verification.
 teams.patch('/roster-players/:playerId', async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT rp.id FROM roster_players rp JOIN roster_versions rv ON rv.id = rp.roster_version_id
@@ -118,13 +126,19 @@ teams.patch('/roster-players/:playerId', async (c) => {
      WHERE rp.id = ? AND co.owner_id = ?`
   ).bind(c.req.param('playerId'), c.get('user').id).first();
   if (!row) return c.json({ error: 'Hráč nenalezen' }, 404);
-  const f = pick(await c.req.json<Record<string, unknown>>().catch(() => null), ['guest_permit', 'struck', 'struck_reason', 'lok', 'fide', 'birth_year'] as const, ['guest_permit', 'struck', 'lok', 'fide', 'birth_year'] as const);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const f: Record<string, string | number | null> = pick(body, ['guest_permit', 'struck', 'struck_reason', 'lok', 'fide', 'birth_year'] as const, ['guest_permit', 'struck', 'lok', 'fide', 'birth_year'] as const);
+  if (body && 'accepted_issues' in body) {
+    const a = body.accepted_issues;
+    if (!Array.isArray(a) || a.length > 50 || a.some((x) => typeof x !== 'string' || x.length > 500)) return c.json({ error: 'Neplatný seznam odsouhlasených nedostatků' }, 400);
+    f.accepted_issues = JSON.stringify([...new Set(a as string[])]);
+  }
   const keys = Object.keys(f);
   if (!keys.length) return c.json({ error: 'Nic ke změně' }, 400);
   // A changed id makes the stored chess.cz check obsolete.
   const reset = 'lok' in f || 'fide' in f ? ', cz_json = NULL, cz_checked_at = NULL, v_json = NULL, v_checked_at = NULL' : '';
   await c.env.DB.prepare(`UPDATE roster_players SET ${keys.map((k) => `${k} = ?`).join(', ')}${reset} WHERE id = ?`)
-    .bind(...keys.map((k) => (f as any)[k]), c.req.param('playerId')).run();
+    .bind(...keys.map((k) => f[k]), c.req.param('playerId')).run();
   return c.json({ ok: true });
 });
 
@@ -149,8 +163,8 @@ teams.get('/competitions/:id/roster-check', async (c) => {
   ]);
   const byTeam = new Map<string, any[]>();
   for (const p of players.results as any[]) {
-    const { cz_json, v_json, team_id, ...rest } = p;
-    byTeam.set(team_id, [...(byTeam.get(team_id) ?? []), { ...rest, cz: cz_json ? JSON.parse(cz_json) : null, v: v_json ? JSON.parse(v_json) : null }]);
+    const { cz_json, v_json, accepted_issues, team_id, ...rest } = p;
+    byTeam.set(team_id, [...(byTeam.get(team_id) ?? []), { ...rest, cz: cz_json ? JSON.parse(cz_json) : null, v: v_json ? JSON.parse(v_json) : null, accepted: parseAccepted(accepted_issues) }]);
   }
   return c.json({ teams: (teamRows.results as any[]).map((t) => ({ ...t, players: byTeam.get(t.id) ?? null })) });
 });

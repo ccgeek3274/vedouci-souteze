@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
@@ -9,7 +9,8 @@ import { RichEditor } from '../../components/RichEditor';
 import { downloadBlob, SAVE_TEXT, saveTagClass, SavepointsCard, useBulletinDraft } from '../../bulletin/draft';
 import { loadRoundCz, refreshRoundCz, roundInput } from '../../bulletin/roundLoad';
 import { buildRoundDocxBlob } from '../../bulletin/roundDocx';
-import { buildRoundPdfBlob } from '../../bulletin/roundPdf';
+import { buildRoundPdfBlob, roundPdfPageMap } from '../../bulletin/roundPdf';
+import { paginate, type PageMap } from '../../bulletin/paginate';
 import { todayIso } from '../../../../shared/bulletin/initial';
 import {
   buildRoundModel, FONT_PTS, normalizeRoundConfig, parseRoundSnapshot, PROFILE_KEYS, PROFILES, REF_LABEL, STAND_HDRS,
@@ -185,6 +186,25 @@ export function RoundBulletin({ nr }: { nr: number }) {
   const contactsOf = useMemo(() => new Map(detail.teams.map((t) => [t.id, refOptions(t.contacts)])), [detail.teams]);
   const lay = useMemo(() => (model ? matchLayout(model.matches, model.fontPt, measure) : null), [model, fontReady]);
   const sl = useMemo(() => (model ? standingsLayout(model.standings, model.fontPt, measure) : null), [model, fontReady]);
+  // Page breaks of the preview: estimate at once, then the real ones from the PDF laid out in the background.
+  const docRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
+  const cssRef = useRef<HTMLStyleElement>(null);
+  const [pageMap, setPageMap] = useState<PageMap | null>(null);
+  const structure = model && cfg ? [model.matches.length, cfg.withRef, cfg.fontPt, cfg.profile, model.standings.length].join() : '';
+  useEffect(() => setPageMap(null), [structure]); // other blocks → the old map does not apply
+  useEffect(() => {
+    if (!model || !lay || !sl) return;
+    let alive = true;
+    const t = window.setTimeout(() => {
+      roundPdfPageMap(model, lay, sl.cols).then((m) => alive && setPageMap(m)).catch(() => { /* the estimate stays */ });
+    }, 300);
+    return () => { alive = false; window.clearTimeout(t); };
+  }, [model, lay, sl]);
+  useLayoutEffect(() => {
+    if (docRef.current && layerRef.current && cssRef.current) paginate(docRef.current, layerRef.current, cssRef.current, pageMap);
+  });
+
 
   if (stored.isLoading || !cfg) return <div className="muted">Načítám…</div>;
   if (stored.error) return <div className="alert">{apiErrorText(stored.error)}</div>;
@@ -232,21 +252,29 @@ export function RoundBulletin({ nr }: { nr: number }) {
           <span className={saveTagClass(draft.saveState)}>{SAVE_TEXT[draft.saveState]}</span>
         </div>
         <div className="card-body">
+          {/* two rows: content options + downloads, then the look (the segmented groups do not fit on one line) */}
           <div className="bulletin-bar">
             <label className="field-inline">Datum vydání
               <input className="input input-sm" type="date" value={cfg.date ?? todayIso()}
                 onChange={(e) => update((x) => ({ ...x, date: e.target.value || null }))} />
             </label>
-            <div className="segmented" title="Vzhled: záhlaví stránky, hlavička a nadpisy kapitol">
-              {PROFILE_KEYS.map((k) => <button key={k} className={cfg.profile === k ? 'active' : ''} onClick={() => setLook({ profile: k })}>{PROFILES[k].name}</button>)}
-            </div>
-            <div className="segmented" title="Písmo tabulek, řádku Rozhodčí a textu Různé (pt)">
-              {FONT_PTS.map((f) => <button key={f} className={cfg.fontPt === f ? 'active' : ''} onClick={() => setLook({ fontPt: f })}>{f} pt</button>)}
-            </div>
             <label className="field-inline"><input type="checkbox" checked={cfg.withRef} onChange={(e) => setLook({ withRef: e.target.checked })} /> rozhodčí</label>
             <span className="spacer" />
             <button className="btn btn-primary" disabled={!model || !!busy} onClick={() => download('docx')}>{busy === 'docx' ? 'Vytvářím…' : 'Stáhnout DOCX'}</button>
             <button className="btn" disabled={!model || !!busy} onClick={() => download('pdf')}>{busy === 'pdf' ? 'Vytvářím…' : 'Stáhnout PDF'}</button>
+          </div>
+          <div className="bulletin-bar bulletin-bar-2">
+            <span className="field-inline">Vzhled
+              <span className="segmented" title="Záhlaví stránky, hlavička a nadpisy kapitol">
+                {PROFILE_KEYS.map((k) => <button key={k} className={cfg.profile === k ? 'active' : ''} onClick={() => setLook({ profile: k })}>{PROFILES[k].name}</button>)}
+              </span>
+            </span>
+            <span className="field-inline">Písmo
+              <span className="segmented" title="Písmo tabulek, řádku Rozhodčí a textu Různé (pt)">
+                {FONT_PTS.map((f) => <button key={f} className={cfg.fontPt === f ? 'active' : ''} onClick={() => setLook({ fontPt: f })}>{f}</button>)}
+              </span>
+              pt
+            </span>
           </div>
           <p className="helper-text">
             Výsledky, pořadí a rozpis kola z chess.cz; rozhodčí z karty <Link to="../rozhodci">Nominace rozhodčích</Link> — ve zpravodaji
@@ -297,23 +325,24 @@ export function RoundBulletin({ nr }: { nr: number }) {
         <div className="card"><div className="card-body muted">{cz.isLoading ? `Načítám data z chess.cz (${progress})…` : c.chesscz_comp_id ? 'Načítám…' : 'Bez chess.cz nelze zpravodaj z kola sestavit.'}</div></div>
       ) : (
         <div className="doc-wrap">
-          <div className="rdoc" style={{ padding: `${px(HDR_DIST)} ${px(MARGIN_X)} ${px(MARGIN_B)}`, fontSize: ptPx(cfg.fontPt) }}>
+          <style ref={cssRef} />
+          <div className="rdoc" ref={docRef} style={{ padding: `${px(HDR_DIST)} ${px(MARGIN_X)} ${px(MARGIN_B)}`, fontSize: ptPx(cfg.fontPt) }}>
             <div className="rdoc-top" style={{ height: px(MARGIN_T - HDR_DIST) }}>
               <div className="rdoc-hdr" style={{ fontSize: ptPx(model.hdr.size), color: css(model.hdr.color), ...ruleCss(model.hdr.rule) }}>
                 {model.hdr.c != null ? <span className="c">{model.hdr.c}</span> : <><span>{model.hdr.l ?? ''}</span><span>{model.hdr.r ?? ''}</span></>}
               </div>
             </div>
             {model.titles.map((t, i) => (
-              <div key={i} style={{
+              <div key={i} data-pg={`t${i}`} data-pg-keep="" style={{
                 fontSize: ptPx(t.size), fontWeight: t.bold ? 700 : 400, color: css(t.color), textAlign: t.align, marginBottom: ptPx(t.after),
                 ...(model.profile.titleRule && i === model.titles.length - 1 ? { borderBottom: `1.5px solid ${css(model.profile.titleRule)}`, paddingBottom: ptPx(3) } : {}),
               }}>{t.text}</div>
             ))}
             {[0, 1, 2].map((ci) => (
               <Fragment key={ci}>
-                <div className={`rdoc-h${ci === 0 ? ' first' : ''}`} style={{ fontSize: ptPx(model.chap.size), color: css(model.chap.color), ...ruleCss(model.chap.rule) }}>{model.chap.labels[ci]}</div>
+                <div className={`rdoc-h${ci === 0 ? ' first' : ''}`} data-pg={`h${ci}`} data-pg-keep="" style={{ fontSize: ptPx(model.chap.size), color: css(model.chap.color), ...ruleCss(model.chap.rule) }}>{model.chap.labels[ci]}</div>
                 {ci === 0 && model.matches.map((m, mi) => (
-                  <table key={m.nr} className="rdoc-res" style={{ width: px(sum(matchCols(lay))) }}>
+                  <table key={m.nr} className="rdoc-res" data-pg={`m${mi}`} style={{ width: px(sum(matchCols(lay))) }}>
                     <Cols ws={matchCols(lay)} />
                     <tbody>
                       <tr className="mh"><td className="c">{m.nr}</td><td colSpan={2}>{m.home}</td><td className="c">{m.score}</td><td className="r" colSpan={2}>{m.away}</td></tr>
@@ -332,7 +361,7 @@ export function RoundBulletin({ nr }: { nr: number }) {
                   </table>
                 ))}
                 {ci === 1 && (
-                  <table className="rdoc-stand" style={{ width: px(sum(sl.cols)) }}>
+                  <table className="rdoc-stand" data-pg="st" style={{ width: px(sum(sl.cols)) }}>
                     <Cols ws={sl.cols} />
                     <thead><tr>{STAND_HDRS.map((h, i) => <th key={h} className={i === 1 ? 'l' : 'c'}>{h}</th>)}</tr></thead>
                     <tbody>{model.standings.map((r, ri) => <tr key={ri}>{r.map((v, i) => <td key={i} className={i === 1 ? 'l' : 'c'}>{v}</td>)}</tr>)}</tbody>
@@ -356,6 +385,7 @@ export function RoundBulletin({ nr }: { nr: number }) {
                 )}
               </Fragment>
             ))}
+            <div className="pg-layer" ref={layerRef} />
           </div>
         </div>
       )}

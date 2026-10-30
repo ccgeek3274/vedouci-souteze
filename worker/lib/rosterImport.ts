@@ -87,9 +87,10 @@ export async function applyRosterImport(
   const version = (preview.previousVersion ?? 0) + 1;
   const versionId = crypto.randomUUID();
   const t = now();
-  // The vedoucí's marks (documents, strikes) and the chess.cz check follow the player into the new version.
+  // The vedoucí's marks (documents, strikes, accepted findings) and the chess.cz check follow the player into the new version.
   const { results: prev } = await db.prepare(
-    `SELECT rp.name, rp.lok, rp.guest_permit, rp.struck, rp.struck_reason, rp.cz_json, rp.cz_checked_at, rp.v_json, rp.v_checked_at
+    `SELECT rp.name, rp.lok, rp.guest_permit, rp.struck, rp.struck_reason, rp.cz_json, rp.cz_checked_at, rp.v_json, rp.v_checked_at,
+            rp.accepted_issues
      FROM roster_players rp JOIN roster_versions rv ON rv.id = rp.roster_version_id WHERE rv.team_id = ? AND rv.version = ?`
   ).bind(team.id, preview.previousVersion ?? 0).all<any>();
   const carryKey = (lok: unknown, name: string) => (lok ? `lok:${lok}` : `name:${fold(name)}`);
@@ -103,10 +104,10 @@ export async function applyRosterImport(
       const o = carried.get(carryKey(p.lok, p.jmeno));
       return db.prepare(
         `INSERT INTO roster_players (roster_version_id, position, name, birth_year, lok, fide, flags, base,
-                                     guest_permit, struck, struck_reason, cz_json, cz_checked_at, v_json, v_checked_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                                     guest_permit, struck, struck_reason, cz_json, cz_checked_at, v_json, v_checked_at, accepted_issues)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(versionId, i + 1, p.jmeno, p.rok || null, p.lok || null, p.fide || null, p.ozn, p.z ? 1 : 0,
-        o?.guest_permit ?? 0, o?.struck ?? 0, o?.struck_reason ?? '', o?.cz_json ?? null, o?.cz_checked_at ?? null, o?.v_json ?? null, o?.v_checked_at ?? null);
+        o?.guest_permit ?? 0, o?.struck ?? 0, o?.struck_reason ?? '', o?.cz_json ?? null, o?.cz_checked_at ?? null, o?.v_json ?? null, o?.v_checked_at ?? null, o?.accepted_issues ?? '[]');
     }),
   ];
   if (preview.teamChanges.length) {

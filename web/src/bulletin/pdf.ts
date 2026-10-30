@@ -136,10 +136,6 @@ function section(s: Section): any[] {
     case 'rosters': return pairs(s.teams).map((p) => ({
       columns: p.map(rosterTable), columnGap: pt(ROSTER_GAP), unbreakable: true, margin: [0, 0, 0, pt(ROSTER_PAIR_GAP)],
     }));
-    case 'deficiencies': return s.teams.flatMap((t) => [
-      { text: t.team, bold: true, margin: [0, 6, 0, 3] },
-      { ul: t.lines.map((l) => ({ text: l })), margin: [0, 0, 0, 3] },
-    ]);
     case 'rounds': return s.rounds.map((r) => roundTable(r, s.withRef));
     case 'links': return s.links.map((l) => ({ text: [`${l.label}: `, { text: l.url, link: l.url, color: '#0563C1', decoration: 'underline' }], margin: [0, 0, 0, 6] }));
     case 'signature': return s.name ? [{

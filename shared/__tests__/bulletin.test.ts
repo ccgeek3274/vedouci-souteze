@@ -72,6 +72,12 @@ describe('model', () => {
     const m = buildModel(data(), defaultConfig());
     const titles = m.chapters.map((c) => c.title);
     expect(titles).toContain('Nedostatky soupisek');
+    const def = m.chapters.find((c) => c.title === 'Nedostatky soupisek')!.sections[0] as any;
+    expect(def.type).toBe('rich'); // editable, generated from the roster check
+    expect(def.blocks.map((b: any) => [b.list, b.runs.map((r: any) => (r.b ? `*${r.text}` : r.text)).join('')]))
+      .toEqual([[null, '*Tým a'], ['bullet', 'Struck Petr: bude vyškrtnut']]);
+    const own = buildModel(data(), { ...defaultConfig(), texts: { deficiencies: textDelta(['Opraveno ručně']) } });
+    expect((own.chapters.find((c) => c.title === 'Nedostatky soupisek')!.sections[0] as any).blocks[0].runs[0].text).toBe('Opraveno ručně');
     const rosters = m.chapters.find((c) => c.title === 'Soupisky družstev')!.sections[0] as any;
     expect(rosters.teams[0].players).toHaveLength(2);
     const rounds = (m.chapters.find((c) => c.title === 'Rozlosování soutěže')!.sections[0] as any).rounds;

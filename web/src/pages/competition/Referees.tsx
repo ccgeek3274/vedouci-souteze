@@ -240,10 +240,12 @@ export function Referees() {
                       return (
                         <tr key={key}>
                           <td className="num">{m.board}</td>
-                          <td>
-                            {team.get(m.home)?.name ?? '?'}
-                            {m.exception && <span className="ref-time"> {m.conflict ? CONFLICT : `${m.time} h`}</span>}
-                            <span className="muted"> – </span>{team.get(m.away)?.name ?? '?'}
+                          <td className="ref-match">
+                            {/* each team on one line; a long pair breaks only after the dash */}
+                            <span className="ref-team">{team.get(m.home)?.name ?? '?'}
+                              {m.exception && <span className="ref-time"> {m.conflict ? CONFLICT : `${m.time} h`}</span>}
+                              <span className="muted"> –</span></span>{' '}
+                            <span className="ref-team">{team.get(m.away)?.name ?? '?'}</span>
                           </td>
                           <td className="ref-cell">
                             {editing ? (

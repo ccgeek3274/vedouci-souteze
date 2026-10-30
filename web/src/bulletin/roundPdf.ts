@@ -27,7 +27,7 @@ function rich(blocks: RichBlock[], base: number): any[] {
   const out: any[] = [];
   let list: any = null;
   let kind: string | null = null;
-  for (const bl of blocks) {
+  blocks.forEach((bl, bi) => {
     const runs = bl.runs.map((r) => {
       const o: any = { text: r.text, fontSize: base };
       if (r.b) o.bold = true;
@@ -36,7 +36,7 @@ function rich(blocks: RichBlock[], base: number): any[] {
       if (r.link) { o.link = r.link; o.color = '#0563C1'; }
       return o;
     });
-    const node = { text: runs.length ? runs : ' ', margin: [0, 0, 0, pt(100)] };
+    const node = { id: `r${bi}`, text: runs.length ? runs : ' ', margin: [0, 0, 0, pt(100)] }; // id: preview page breaks
     if (bl.list) {
       const key = bl.list === 'ordered' ? 'ol' : 'ul';
       if (!list || kind !== key) { list = { [key]: [], margin: [0, 0, 0, 0] }; kind = key; out.push(list); }
@@ -45,7 +45,7 @@ function rich(blocks: RichBlock[], base: number): any[] {
       list = null;
       out.push(node);
     }
-  }
+  });
   // no space under the last paragraph — on a full page pdfmake would add an empty page just for it
   const last = out[out.length - 1];
   if (last) ((last.ul ?? last.ol)?.[(last.ul ?? last.ol).length - 1] ?? last).margin = [0, 0, 0, 0];
@@ -64,14 +64,14 @@ export function buildRoundPdfDef(model: RoundModel, lay: MatchLayout, standCols:
   const fpt = model.fontPt;
   const ch = model.chap;
   const chapter = (i: number, before: number) => {
-    const t = { text: ch.labels[i], bold: true, fontSize: ch.size, color: color(ch.color) };
+    const t = { id: `h${i}`, text: ch.labels[i], bold: true, fontSize: ch.size, color: color(ch.color) };
     return ch.rule ? { stack: [t, rule(ch.rule, 0.75)], margin: [0, before, 0, pt(80)] } : { ...t, margin: [0, before, 0, pt(80)] };
   };
   // pdfmake has no keepNext: a chapter title and its first item form one unbreakable block
   const keep = (head: any, next: any) => (next ? { stack: [head, next], unbreakable: true } : head);
 
   const content: any[] = model.titles.map((t, i) => {
-    const tx = { text: t.text, bold: !!t.bold, fontSize: t.size, alignment: t.align, color: color(t.color) };
+    const tx = { id: `t${i}`, text: t.text, bold: !!t.bold, fontSize: t.size, alignment: t.align, color: color(t.color) };
     const titleRule = model.profile.titleRule;
     return titleRule && i === model.titles.length - 1
       ? { stack: [tx, { ...rule(titleRule, 1.5), margin: [0, 3, 0, 0] }], margin: [0, 0, 0, t.after] }
@@ -83,7 +83,7 @@ export function buildRoundPdfDef(model: RoundModel, lay: MatchLayout, standCols:
   const matches = model.matches.map((m, mi) => {
     const h = { bold: true, fillColor: fill };
     const body: any[] = [[
-      { text: m.nr, alignment: 'center', noWrap: true, ...h }, { text: m.home, colSpan: 2, ...h }, {},
+      { id: `m${mi}`, text: m.nr, alignment: 'center', noWrap: true, ...h }, { text: m.home, colSpan: 2, ...h }, {},
       { text: m.score, alignment: 'center', ...h }, { text: m.away, colSpan: 2, alignment: 'right', ...h }, {},
     ]];
     m.games.forEach((g, i) => body.push([
@@ -101,7 +101,7 @@ export function buildRoundPdfDef(model: RoundModel, lay: MatchLayout, standCols:
   content.push(keep(chapter(0, pt(60)), matches[0]), ...matches.slice(1));
 
   const sBody = [
-    STAND_HDRS.map((x, i) => ({ text: x, bold: true, fillColor: fill, alignment: STAND_ALIGN[i] })),
+    STAND_HDRS.map((x, i) => ({ id: i ? undefined : 'st', text: x, bold: true, fillColor: fill, alignment: STAND_ALIGN[i] })),
     ...model.standings.map((vals, idx) => vals.map((v, i) => ({ text: v, alignment: STAND_ALIGN[i], fillColor: idx % 2 === 1 ? `#${C_ALT}` : null }))),
   ];
   content.push(keep(chapter(1, pt(200)), {
@@ -121,10 +121,30 @@ export function buildRoundPdfDef(model: RoundModel, lay: MatchLayout, standCols:
   };
 }
 
+// pdfmake rewrites the definition in place — never hand it arrays shared with the (rendered) model
+// (the profile holds functions — not cloneable, and the definition does not reference its arrays)
+const ownDef = (model: RoundModel, lay: MatchLayout, standCols: number[]) => {
+  const { profile, ...data } = model;
+  return buildRoundPdfDef({ ...structuredClone(data), profile }, lay, standCols);
+};
+
 export async function buildRoundPdfBlob(model: RoundModel, lay: MatchLayout, standCols: number[]): Promise<Blob> {
   const pdfMake = await loadPdfMake();
-  // pdfmake rewrites the definition in place — never hand it arrays shared with the (rendered) model
-  // (the profile holds functions — not cloneable, and the definition does not reference its arrays)
-  const { profile, ...data } = model;
-  return pdfMake.createPdf(buildRoundPdfDef({ ...structuredClone(data), profile }, lay, standCols)).getBlob();
+  return pdfMake.createPdf(ownDef(model, lay, standCols)).getBlob();
+}
+
+/**
+ * Page of every block of the PDF (ids t*, h*, m*, st, r* — the same as data-pg in the preview), for the page breaks
+ * of the preview. The PDF is laid out in memory and thrown away.
+ */
+export async function roundPdfPageMap(model: RoundModel, lay: MatchLayout, standCols: number[]): Promise<Record<string, number>> {
+  const pdfMake = await loadPdfMake();
+  const map: Record<string, number> = {};
+  const def = ownDef(model, lay, standCols);
+  def.pageBreakBefore = (n: any) => {
+    if (n.id && !(n.id in map)) map[n.id] = n.startPosition.pageNumber;
+    return false;
+  };
+  await pdfMake.createPdf(def).getBuffer();
+  return map;
 }

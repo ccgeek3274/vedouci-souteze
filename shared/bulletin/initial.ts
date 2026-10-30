@@ -7,7 +7,7 @@ import { refKey, rotatedReferees } from '../schedule';
 
 export { refKey, rotatedReferees };
 
-export const TEXT_KEYS = ['intro', 'requirements', 'referees', 'announcements', 'results'] as const;
+export const TEXT_KEYS = ['intro', 'requirements', 'deficiencies', 'referees', 'announcements', 'results'] as const;
 export type TextKey = (typeof TEXT_KEYS)[number];
 
 /** What the vedoucí sets on the draft (stored; save points copy it). Everything else is generated. */
@@ -96,7 +96,6 @@ export type Section =
   | { type: 'venues'; rows: { stc: number | null; name: string; venue: string }[] }
   | { type: 'contacts'; teams: { name: string; rows: ContactRow[] }[] }
   | { type: 'rosters'; teams: { stc: number | null; name: string; players: RosterRow[] }[] }
-  | { type: 'deficiencies'; teams: { team: string; lines: string[] }[] }
   | { type: 'rounds'; rounds: RoundView[]; withRef: boolean }
   | { type: 'links'; links: { label: string; url: string }[] }
   | { type: 'signature'; name: string; email: string; phone: string }
@@ -239,10 +238,20 @@ export function defaultTexts(data: BulletinData): Record<TextKey, DeltaOp[]> {
   return {
     intro: textDelta([intro]),
     requirements: textDelta(requirements),
+    deficiencies: deficiencyDelta(data.deficiencies),
     referees: textDelta(referees),
     announcements: textDelta(announcements),
     results: textDelta(results),
   };
+}
+
+/** Roster check findings: the team in bold, its findings as bullet items (editable chapter of the preliminary bulletin). */
+export function deficiencyDelta(teams: BulletinData['deficiencies']): DeltaOp[] {
+  if (!teams.length) return textDelta(['Kontrolou soupisek nebyly zjištěny žádné nedostatky.']);
+  return teams.flatMap((t) => [
+    { insert: t.team, attributes: { bold: true } }, { insert: '\n' },
+    ...t.lines.flatMap((l) => [{ insert: l }, { insert: '\n', attributes: { list: 'bullet' } }]),
+  ]);
 }
 
 /** Start of the last round ("9:00"): the competition's alternative last-round start, else the default start. */
@@ -336,9 +345,7 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
     { title: 'Soupisky družstev', sections: [{ type: 'rosters', teams: rosters }] },
     ...(definitive ? [] : [{
       title: 'Nedostatky soupisek',
-      sections: [data.deficiencies.length
-        ? { type: 'deficiencies', teams: data.deficiencies } as Section
-        : { type: 'lines', lines: ['Kontrolou soupisek nebyly zjištěny žádné nedostatky.'] } as Section],
+      sections: [rich('deficiencies')], // generated from the roster check, editable
     }]),
     { title: 'Rozlosování soutěže', sections: [{ type: 'rounds', rounds, withRef: cfg.withRef }] },
     { title: 'Specifické požadavky', sections: [{ type: 'lines', lines: requirementLines }, rich('requirements')] },

@@ -254,7 +254,23 @@ export type Issue = {
   text: string;
   /** Reason to strike the player before the definitive bulletin (rozpis: registration, hosting permit). */
   strike?: boolean;
+  /** Accepted manually by the vedoucí: not a deficiency any more (not red, not in the bulletin, no strike). */
+  accepted?: boolean;
 };
+
+/** Marks the issues accepted by the vedoucí (matched by text — a changed finding has to be accepted again). */
+export function withAccepted(issues: Issue[], accepted: readonly string[] | null | undefined): Issue[] {
+  if (!accepted?.length) return issues;
+  return issues.map((i) => (accepted.includes(i.text) ? { ...i, accepted: true } : i));
+}
+
+/** Issues that still count (not accepted). */
+export const openIssues = (issues: Issue[]) => issues.filter((i) => !i.accepted);
+
+/** New accepted list after toggling one issue (texts no longer found are dropped). */
+export function toggleAccepted(issues: Issue[], text: string): string[] {
+  return issues.filter((i) => (i.text === text ? !i.accepted : i.accepted)).map((i) => i.text);
+}
 
 export type IssueContext = {
   clubCode: string | null;
@@ -370,7 +386,7 @@ export function playerIssues(p: CheckPlayer & { base?: number }, check: CzCheck 
 
 /** Strike reason text from the issues (empty = no reason to strike). */
 export function strikeReason(issues: Issue[]): string {
-  return issues.filter((i) => i.strike).map((i) => i.text).join('; ');
+  return issues.filter((i) => i.strike && !i.accepted).map((i) => i.text).join('; ');
 }
 
 /** Plain-text deficiency list per team — the section of the preliminary bulletin (rozpis: "zjištěné nedostatky"). */
@@ -378,7 +394,7 @@ export function deficiencyReport(teams: { name: string; players: { name: string;
   return teams
     .map((t) => {
       // Deficiencies + everything that leads to striking (e.g. a missing hosting confirmation).
-      const relevant = (i: Issue) => i.level === 'bad' || i.strike;
+      const relevant = (i: Issue) => !i.accepted && (i.level === 'bad' || i.strike);
       const lines = t.players
         .filter((p) => !p.struck && p.issues.some(relevant))
         .map((p) => `- ${p.name}: ${p.issues.filter(relevant).map((i) => i.text).join('; ')}`);

@@ -34,10 +34,19 @@ Záložka **Zpravodaj** má v hlavičce přepínač *Úvodní · 1. kolo · 2. k
 - Vedoucí z údajů soutěže v aplikaci (`signatureName`), záložně `compManagerName` z chess.cz.
 - Název souboru `{zkratka}_{rr}_{rr}_{kk}` (např. `rpb_26_27_01`), bez šablony ze sscr-zpravodaj.
 
+- **Náhled stránkovaný jako PDF** (port `paginatePreview` ze sscr-zpravodaj, `web/src/bulletin/paginate.ts`):
+  náhled je 1:1 s DOCX/PDF a dělí se na strany A4 (mezera „strana N / M“, záhlaví dalších stran). Kde začíná strana,
+  určuje skutečné rozložení PDF: 300 ms po změně se na pozadí sestaví PDF (`roundPdfPageMap`) a `pageBreakBefore`
+  vrátí stranu každého bloku (id uzlů PDF = `data-pg` v náhledu: `t*` nadpisy, `h*` kapitoly, `m*` zápasy, `st`
+  pořadí, `r*` odstavce Různé). Do té doby odhad z rozměrů náhledu (zápas ani tabulka se nedělí, nadpis drží
+  s následujícím, odstavec Různé celý). Blok se posune přes `margin-top`, odstavce Quillu přes generovaný stylesheet;
+  lišty editoru v sazbě nejsou (stránka s nimi je v náhledu delší). Při změně struktury (počet zápasů, písmo, vzhled,
+  rozhodčí) se stará mapa zahodí. Editor Různé v náhledu bez vnitřních okrajů jako odstavce PDF.
+- Nastavení ve dvou řádcích: datum, rozhodčí, stažení / Vzhled, Písmo (na jeden řádek se nevešly).
+
 ## Oproti sscr-zpravodaj vynecháno
 - Výběr soutěže / historie / cache v localStorage (soutěž je daná, cache drží proxy).
 - Velikost písma po úsecích v Různé (tlačítka 9–16 pt) — editor aplikace má B/I/U, seznamy a odkazy; velikost je jedna (přepínač Písmo).
-- Stránkování náhledu podle rozložení PDF (náhled je jeden dlouhý list).
 
 ## Edge cases
 - Živé pořadí je aktuální `/table`: když už se hrálo pozdější kolo, náhled varuje, že pořadí neodpovídá stavu po kole

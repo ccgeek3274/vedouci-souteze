@@ -23,6 +23,9 @@ zpravodaje RPB 2026/27 (`doc/rpb_26_27_uz_v3.docx`) a o PDF (pdfmake + Carlito j
 - **Předběžný × definitivní**: předběžný má kapitolu *Nedostatky soupisek* (z kontroly soupisek M6: chyby,
   důvody k vyškrtnutí, vyškrtnutí hráči) a obsahuje všechny hráče; definitivní vynechá vyškrtnuté hráče
   (podle LOK z poslední verze soupisky v aplikaci) a kapitolu nedostatků.
+- **Nedostatky soupisek jsou upravitelná kapitola** (text `deficiencies`, jako ostatní editovatelné kapitoly):
+  výchozí text se generuje z kontroly soupisek (družstvo tučně, nálezy jako odrážky, `deficiencyDelta`) a sleduje ji,
+  dokud ho vedoucí neupraví. Odsouhlasené nálezy (✓ na Kontrole soupisek) se do něj negenerují.
 
 ## Kapitoly
 Titul (název a region z chess.cz, „(Předběžný) úvodní zpravodaj – ročník“, datum vydání), úvod, 1. Hrací místnost,

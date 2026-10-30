@@ -169,7 +169,7 @@ export function InitialBulletin() {
 }
 
 const TEXT_HINT: Record<TextKey, string> = {
-  intro: 'Úvod', requirements: 'Doplňující text', referees: 'Rozhodčí', announcements: 'Další oznámení', results: 'Hlášení výsledků',
+  intro: 'Úvod', requirements: 'Doplňující text', deficiencies: 'Nedostatky soupisek', referees: 'Rozhodčí', announcements: 'Další oznámení', results: 'Hlášení výsledků',
 };
 
 function SectionView({ s, cfg, update, version }: {
@@ -231,8 +231,6 @@ function SectionView({ s, cfg, update, version }: {
           </div>
         ))}</>
       );
-    case 'deficiencies':
-      return <>{s.teams.map((t) => <div key={t.team} className="d-p"><b>{t.team}</b><ul>{t.lines.map((l) => <li key={l}>{l}</li>)}</ul></div>)}</>;
     case 'rounds':
       return (
         <>

@@ -2,7 +2,7 @@
 // (sequential, the proxy spaces calls to ~3 req/s), registries through /registry (cached 1 h on the server).
 import { api, ApiError, apiErrorText } from './api';
 import {
-  collectHigherRosters, expectedBase, LEVEL_RANK, lookupRoster, playerIssues, registryRows,
+  collectHigherRosters, expectedBase, LEVEL_RANK, lookupRoster, playerIssues, registryRows, withAccepted,
   type Issue, type LookupResult, type Registry, type VCheck,
 } from '../../../shared/roster/verify';
 import type { Competition, RosterCheckData, RosterPlayer } from './types';
@@ -79,7 +79,7 @@ export function competitionIssues(data: RosterCheckData, c: Competition): Map<nu
     const players = t.players ?? [];
     const z = expectedBase(players, c.boards);
     players.forEach((p, i) => {
-      out.set(p.id, p.struck ? [] : playerIssues(p, p.cz, { clubCode: t.club_code, compName: c.name, expectedZ: z[i], base: c.boards, v: p.v }));
+      out.set(p.id, p.struck ? [] : withAccepted(playerIssues(p, p.cz, { clubCode: t.club_code, compName: c.name, expectedZ: z[i], base: c.boards, v: p.v }), p.accepted));
     });
   }
   return out;

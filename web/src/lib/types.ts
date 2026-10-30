@@ -37,6 +37,7 @@ export type RosterPlayer = {
   flags: string; base: number; guest_permit: number; struck: number; struck_reason: string;
   cz: CzCheck | null; cz_checked_at: number | null;
   v: VCheck | null; v_checked_at: number | null;
+  accepted?: string[]; // accepted roster check findings (issue texts)
 };
 export type RosterCheckData = {
   teams: { id: string; name: string; club_name: string; club_code: string | null; players: RosterPlayer[] | null }[];

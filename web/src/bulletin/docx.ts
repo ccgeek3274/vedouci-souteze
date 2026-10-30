@@ -213,10 +213,6 @@ function buildDocument(D: Docx, model: BulletinModel) {
       case 'venues': return [venues(s.rows)];
       case 'contacts': return [contacts(s.teams)];
       case 'rosters': return pairs(s.teams).flatMap((p) => [rosterPair(p), pairGap()]);
-      case 'deficiencies': return s.teams.flatMap((t) => [
-        para([run(t.team, { bold: true })], { spacing: { before: 120, after: 60 }, keepNext: true }),
-        ...t.lines.map((l) => new D.Paragraph({ bullet: { level: 0 }, spacing: { before: 0, after: 40 }, children: [run(l)] })),
-      ]);
       case 'rounds': return s.rounds.flatMap((r, i) => [roundTable(r, s.withRef), ...(i < s.rounds.length - 1 ? [gap()] : [])]);
       case 'links': return s.links.map((l) => para([run(`${l.label}: `), link(l.url, l.url)]));
       case 'signature': {
