@@ -56,7 +56,12 @@ oddíl družstva), bez návrhu na vyškrtnutí.
 Rozhodnutí 8. 10. 2026:
 - Vyškrtnutí = příznak (hráč zůstává přeškrtnutý, lze vrátit); odebrání hráče jen ručně v editaci soupisky.
 - Jméno se musí shodovat s ID (LOK/FIDE) — neshoda = nedostatek (typicky překlep v ID). Rozlišení ml./st. se
-  dopočítá automaticky při generování úvodního zpravodaje (M8), na soupisce ho neevidujeme.
+  dopočítá automaticky při generování úvodního zpravodaje (M8), na soupisce ho neevidujeme (při porovnání se ignoruje).
+- **Preferovaný zápis jména je chess.cz** (rozhodnutí 30. 10. 2026): do SM se vkládá jen ID a písmenka, zbytek SM
+  načte z Elo listiny — tedy totéž co chess.cz. Stejný hráč jinak zapsaný (pořadí, diakritika, velikost písmen, ml./st.)
+  → upozornění „na chess.cz zapsán jako …“ s tlačítkem *převzít z chess.cz* (`Issue.czName`, PATCH `name`), hromadně
+  *Jména hráčů podle chess.cz*. U nedostatku „jméno nesouhlasí s ID“ jde převzít jméno také, ale jen jednotlivě
+  a po potvrzení (obvykle je chyba v ID — převzetím by na soupisce zůstal jiný hráč).
 - Sloupec Z: normální hodnoty jsou „ano“, „Z“ (generátor sscr-soupiska) a prázdno; cokoli jiného se tolerantně
   vyhodnotí a nahlásí upozorněním při importu.
 
@@ -80,11 +85,13 @@ Lehká kontrola bez chess.cz (`shared/roster/contactNames.ts`, karta družstva n
 zástupce, komunikace a rozhodčích se porovnají se soupiskami (nevyškrtnutí hráči). Soupisky, chess.cz i zpravodaje
 píšou „Příjmení Jméno“; kontakt v jiném pořadí by šel do adresáře a k rozhodčím ve zpravodaji obráceně.
 - Hráč se stejnými slovy v jiném pořadí (vlastní soupiska, pak ostatní v soutěži) → „přehozené jméno a příjmení?“,
-  návrh = jméno ze soupisky.
+  návrh = jméno hráče v preferovaném zápisu (z chess.cz, je-li to stejné jméno, jinak ze soupisky).
 - Lidé mimo soupisky (typicky rozhodčí): první slovo je na soupiskách křestní jméno (poslední slovo) a nikde
   příjmení, poslední slovo nikde křestní → „vypadá jako Jméno Příjmení“, návrh = první slovo na konec (jen bez titulů).
 - Tituly a ml./st. se ignorují, diakritika a velikost písmen také. Jen upozornění (!), nejde do zpravodaje,
   nejde odsouhlasit; *opravit na …* přepíše kontakt (všechny kontakty družstva s tím jménem — kapitán bývá i rozhodčí).
+  Hromadně: v kartě družstva *Opravit všechna přehozená jména v kontaktech*, pro celou soutěž tlačítko nahoře —
+  obojí jen přehozená (shoda se soupiskou), odhady „Jméno Příjmení“ jen jednotlivě.
   Nominace rozhodčích mají jména uložená zvlášť — po opravě kontaktu je případně opravit tam.
 
 ## Ruční úprava soupisky

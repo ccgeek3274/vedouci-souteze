@@ -256,7 +256,13 @@ export type Issue = {
   strike?: boolean;
   /** Accepted manually by the vedoucí: not a deficiency any more (not red, not in the bulletin, no strike). */
   accepted?: boolean;
+  /** The player's name on chess.cz — the finding goes away by taking it over (preferred form: SM loads it too). */
+  czName?: string;
 };
+
+const oneSpace = (s: string) => s.trim().replace(/\s+/g, ' ');
+/** Without ml. / st. — not kept on the roster (derived from the birth year in the bulletin). */
+const noSuffix = (s: string) => s.split(/\s+/).filter((w) => !/^(ml|st)\.?$/i.test(w)).join(' ');
 
 /** Marks the issues accepted by the vedoucí (matched by text — a changed finding has to be accepted again). */
 export function withAccepted(issues: Issue[], accepted: readonly string[] | null | undefined): Issue[] {
@@ -317,7 +323,12 @@ export function playerIssues(p: CheckPlayer & { base?: number }, check: CzCheck 
     }
     if (foreign && reg === 'aktivni') out.push({ level: 'bad', text: 'označen C, ale na chess.cz není registrován jako cizinec' });
     // The player is identified by his ids; a different name usually means a typo in the LOK / FIDE id.
-    if (m.fullName && !sameName(p.name, m.fullName)) out.push({ level: 'bad', text: `jméno nesouhlasí s ID — na chess.cz „${m.fullName.trim()}“` });
+    if (m.fullName) {
+      const cz = oneSpace(m.fullName);
+      if (!sameName(noSuffix(p.name), cz)) out.push({ level: 'bad', text: `jméno nesouhlasí s ID — na chess.cz „${cz}“`, czName: cz });
+      // same person, another spelling (word order, diacritics, case) — chess.cz is the preferred form
+      else if (oneSpace(p.name) !== cz) out.push({ level: 'warn', text: `na chess.cz zapsán jako „${cz}“`, czName: cz });
+    }
     if (p.birth_year && m.birthYear && p.birth_year !== m.birthYear) out.push({ level: 'warn', text: `rok narození na chess.cz ${m.birthYear}` });
     if (p.fide && m.fideId && p.fide !== m.fideId) out.push({ level: 'warn', text: `FIDE ID na chess.cz ${m.fideId}` });
     if (ctx.clubCode && m.clubId) {

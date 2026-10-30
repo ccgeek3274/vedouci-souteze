@@ -8,7 +8,7 @@ import { parseContactPaste } from '../../../../shared/contacts';
 import { ClubInput } from '../../components/ClubInput';
 import type { Contact, Request, RosterPlayer, RosterVersion, Team } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
-import { IssueList, useRosterCheck } from './RosterCheck';
+import { IssueList, takeName, useRosterCheck } from './RosterCheck';
 import { RosterEditor } from './RosterEditor';
 import { FlagCells } from '../../components/FlagCells';
 import { NewRequestForm, RequestTable, requestSummary } from './RequestItems';
@@ -127,7 +127,8 @@ export function TeamDetail() {
                           <td style={{ minWidth: 220 }}>
                             {p.struck ? <div className="issues"><div className="bad">vyškrtnut{p.struck_reason && `: ${p.struck_reason}`}</div></div>
                               : !p.cz ? <span className="muted" style={{ fontSize: 12.5 }}>neověřeno</span>
-                              : issues.get(p.id)?.length ? <IssueList issues={issues.get(p.id)!} onToggle={(text) => patchPlayer(p.id, { accepted_issues: toggleAccepted(issues.get(p.id)!, text) })} />
+                              : issues.get(p.id)?.length ? <IssueList issues={issues.get(p.id)!} onToggle={(text) => patchPlayer(p.id, { accepted_issues: toggleAccepted(issues.get(p.id)!, text) })}
+                                onTakeName={(i) => takeName(p, i) && patchPlayer(p.id, { name: i.czName })} />
                               : <span className="tag ok">OK</span>}
                           </td>
                           <td className="actions">

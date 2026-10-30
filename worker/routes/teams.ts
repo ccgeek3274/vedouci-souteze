@@ -118,7 +118,7 @@ function parseAccepted(s: unknown): string[] {
   } catch { return []; }
 }
 
-// Mark a player of the current roster (guest permit / struck / accepted findings) or fix his ids — M6 verification.
+// Mark a player of the current roster (guest permit / struck / accepted findings) or fix his ids / name — M6 verification.
 teams.patch('/roster-players/:playerId', async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT rp.id FROM roster_players rp JOIN roster_versions rv ON rv.id = rp.roster_version_id
@@ -128,6 +128,11 @@ teams.patch('/roster-players/:playerId', async (c) => {
   if (!row) return c.json({ error: 'Hráč nenalezen' }, 404);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const f: Record<string, string | number | null> = pick(body, ['guest_permit', 'struck', 'struck_reason', 'lok', 'fide', 'birth_year'] as const, ['guest_permit', 'struck', 'lok', 'fide', 'birth_year'] as const);
+  if (body && 'name' in body) {
+    const name = String(body.name ?? '').trim().replace(/\s+/g, ' ');
+    if (!name || name.length > 200) return c.json({ error: 'Neplatné jméno hráče' }, 400);
+    f.name = name;
+  }
   if (body && 'accepted_issues' in body) {
     const a = body.accepted_issues;
     if (!Array.isArray(a) || a.length > 50 || a.some((x) => typeof x !== 'string' || x.length > 500)) return c.json({ error: 'Neplatný seznam odsouhlasených nedostatků' }, 400);

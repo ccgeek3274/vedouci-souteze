@@ -113,6 +113,14 @@ describe('playerIssues', () => {
 
   it('treats a name differing from the id as a deficiency', () => {
     expect(playerIssues(player({ name: 'Novák Josef' }), found({}), ctx).map((i) => [i.level, i.text])).toEqual([['bad', 'jméno nesouhlasí s ID — na chess.cz „Novák Jan“']]);
+    expect(playerIssues(player({ name: 'Novák Josef' }), found({}), ctx)[0].czName).toBe('Novák Jan');
+  });
+
+  it('reports another spelling of the same name (chess.cz is the preferred form)', () => {
+    for (const name of ['Jan Novák', 'Novak Jan', 'NOVÁK Jan', 'Novák Jan ml.']) {
+      expect(playerIssues(player({ name }), found({}), ctx).map((i) => [i.level, i.text, i.czName])).toEqual([['warn', 'na chess.cz zapsán jako „Novák Jan“', 'Novák Jan']]);
+    }
+    expect(playerIssues(player({ name: ' Novák  Jan ' }), found({}), ctx)).toEqual([]);
   });
 
   it('reports missing ids', () => {

@@ -4,7 +4,8 @@ import { api, apiErrorText } from '../../lib/api';
 import { czDateTime, ROLE_LABEL } from '../../lib/format';
 import { checkTeamRoster, checkedAt, chessczGet, competitionIssues, prepareCheck, runVCheck } from '../../lib/rosterCheck';
 import type { Contact, RosterCheckData, RosterPlayer } from '../../lib/types';
-import { contactNameFindings, type ContactNameFinding } from '../../../../shared/roster/contactNames';
+import { contactNameFindings, fixContactNames, type ContactNameFinding } from '../../../../shared/roster/contactNames';
+import { sameName } from '../../../../shared/schedule';
 import { asArray, deficiencyReport, strikeReason, toggleAccepted, type Issue } from '../../../../shared/roster/verify';
 import { sameCompetition, type RosterCheckSection } from '../../../../shared/registry';
 import { fold } from '../../../../shared/text';
@@ -33,13 +34,43 @@ export function RosterCheck() {
   if (isLoading || !data) return <p style={{ color: 'var(--cream)' }}>Načítání…</p>;
   const issues = competitionIssues(data, c);
   const withRoster = data.teams.filter((t) => t.players?.length);
-  // contact names against the rosters (light, no chess.cz)
-  const rosterNames = (t: Team) => (t.players ?? []).filter((p) => !p.struck).map((p) => p.name);
+  // contact names against the rosters (light, no chess.cz); a player's name as on chess.cz is the preferred form
+  const preferred = (p: RosterPlayer) => { const cz = p.cz?.member?.fullName?.trim(); return cz && sameName(p.name, cz) ? cz : p.name; };
+  const rosterNames = (t: Team) => (t.players ?? []).filter((p) => !p.struck).map(preferred);
   const contactsOf = (t: Team) => comp.teams.find((x) => x.id === t.id)?.contacts ?? [];
   const nameFindings = new Map(data.teams.map((t) => [
     t.id, contactNameFindings(contactsOf(t), rosterNames(t), data.teams.filter((o) => o.id !== t.id).flatMap(rosterNames)),
   ]));
   const nameCount = [...nameFindings.values()].reduce((n, f) => n + f.length, 0);
+  const swappedTeams = data.teams.filter((t) => nameFindings.get(t.id)!.some((f) => f.kind === 'swapped'));
+  const swappedCount = swappedTeams.reduce((n, t) => n + nameFindings.get(t.id)!.filter((f) => f.kind === 'swapped').length, 0);
+  const fixAllContacts = async () => {
+    if (!window.confirm(`Opravit přehozená jména v kontaktech podle soupisek (${swappedCount})?`)) return;
+    setError(null);
+    try {
+      for (const t of swappedTeams) {
+        await api.put(`/teams/${t.id}/contacts`, { contacts: fixContactNames(contactsOf(t), nameFindings.get(t.id)!.filter((f) => f.kind === 'swapped')) });
+      }
+    } catch (e) {
+      setError(apiErrorText(e));
+    }
+    await refreshCompetition();
+  };
+  // players written otherwise than on chess.cz (same person) → take over the chess.cz form
+  const respell = withRoster.flatMap((t) => t.players!.flatMap((p) => {
+    const i = !p.struck && (issues.get(p.id) ?? []).find((x) => x.level === 'warn' && x.czName && !x.accepted);
+    return i ? [{ p, name: i.czName! }] : [];
+  }));
+  const respellAll = async () => {
+    if (!window.confirm(`Přepsat jména hráčů na soupiskách v aplikaci na zápis z chess.cz (${respell.length}) — pořadí, diakritika, ml./st.?`)) return;
+    setError(null);
+    try {
+      for (const x of respell) await api.patch(`/roster-players/${x.p.id}`, { name: x.name });
+    } catch (e) {
+      setError(apiErrorText(e));
+    }
+    await refresh();
+  };
 
   const run = async (list: Team[]) => {
     setError(null);
@@ -95,8 +126,9 @@ export function RosterCheck() {
             hostování a cizinci podle registrů ŠSČR (hostovani / registracecizincu.appchess.cz). Označení V má samostatnou kontrolu níže.
             Každý nález lze <b>odsouhlasit</b> (✓) — pak se nepočítá jako nedostatek, nenavrhuje vyškrtnutí a nejde do zpravodaje.
             Kontrola volá chess.cz postupně (~3 dotazy/s), u celé skupiny trvá asi minutu.
-            Jména v kontaktech (kapitán, zástupce, komunikace, rozhodčí) se hned porovnají se soupiskami bez chess.cz — upozorní
-            na přehozené jméno a příjmení (soupisky i zpravodaj mají Příjmení Jméno).
+            Preferovaný zápis jména hráče je ten z chess.cz (SM ho při vložení podle ID načte z Elo listiny) — jiný zápis
+            stejného hráče se nabídne k převzetí. Jména v kontaktech (kapitán, zástupce, komunikace, rozhodčí) se hned porovnají
+            se soupiskami bez chess.cz — upozorní na přehozené jméno a příjmení (soupisky i zpravodaj mají Příjmení Jméno).
           </p>
           <div className="row">
             <button className="btn btn-primary" disabled={!!progress || !withRoster.length} onClick={() => run(withRoster)}>Ověřit všechny soupisky na chess.cz</button>
@@ -104,6 +136,8 @@ export function RosterCheck() {
               <button className="btn" disabled={!!progress} onClick={() => run(withRoster.filter((t) => t.players!.some((p) => !p.cz)))}>Jen neověřené</button>
             )}
             {toStrike > 0 && <button className="btn" disabled={!!progress} onClick={strikeAll}>Vyškrtnout navržené ({toStrike})</button>}
+            {respell.length > 0 && <button className="btn" disabled={!!progress} onClick={respellAll} title="Stejný hráč, jiný zápis jména (pořadí, diakritika) — převezme se zápis z chess.cz">Jména hráčů podle chess.cz ({respell.length})</button>}
+            {swappedCount > 0 && <button className="btn" disabled={!!progress} onClick={fixAllContacts} title="Kontakty se jménem v opačném pořadí než na soupisce">Opravit přehozená jména v kontaktech ({swappedCount})</button>}
             {progress && <span className="muted mono">{progress}</span>}
           </div>
         </div>
@@ -171,12 +205,12 @@ function ContactNames({ teamId, contacts, findings, onChanged }: {
 }) {
   const [error, setError] = useState<string | null>(null);
   if (!findings.length) return null;
-  const fix = async (f: ContactNameFinding) => {
+  const swapped = findings.filter((f) => f.kind === 'swapped');
+  const fix = async (list: ContactNameFinding[]) => {
     setError(null);
     try {
       // the same person in more roles (captain and referee) — all at once
-      const wrong = contacts[f.index].name.trim();
-      await api.put(`/teams/${teamId}/contacts`, { contacts: contacts.map((ct) => (ct.name.trim() === wrong ? { ...ct, name: f.suggestion } : ct)) });
+      await api.put(`/teams/${teamId}/contacts`, { contacts: fixContactNames(contacts, list) });
       await onChanged();
     } catch (e) {
       setError(apiErrorText(e));
@@ -187,16 +221,22 @@ function ContactNames({ teamId, contacts, findings, onChanged }: {
       {findings.map((f) => (
         <div key={f.index} className="warn">
           ! {ROLE_LABEL[contacts[f.index].role]}: {f.text}
-          {f.suggestion && <button className="issue-acc" title="Přepsat jméno v kontaktech družstva" onClick={() => fix(f)}>opravit na {f.suggestion}</button>}
+          {f.suggestion && <button className="issue-acc" title="Přepsat jméno v kontaktech družstva" onClick={() => fix([f])}>opravit na {f.suggestion}</button>}
         </div>
       ))}
+      {swapped.length > 1 && (
+        <div><button className="btn btn-small" onClick={() => fix(swapped)}>Opravit všechna přehozená jména v kontaktech ({swapped.length})</button></div>
+      )}
       {error && <div className="bad">{error}</div>}
     </div>
   );
 }
 
-/** Findings of a player; with `onToggle` each one can be accepted manually (and the acceptance taken back). */
-export function IssueList({ issues, onToggle }: { issues: Issue[]; onToggle?: (text: string) => void }) {
+/**
+ * Findings of a player; with `onToggle` each one can be accepted manually (and the acceptance taken back), with
+ * `onTakeName` a different name can be replaced by the one on chess.cz.
+ */
+export function IssueList({ issues, onToggle, onTakeName }: { issues: Issue[]; onToggle?: (text: string) => void; onTakeName?: (i: Issue) => void }) {
   return (
     <div className="issues">
       {issues.map((i) => (
@@ -206,9 +246,19 @@ export function IssueList({ issues, onToggle }: { issues: Issue[]; onToggle?: (t
             <button className="issue-acc" title={i.accepted ? 'Zrušit odsouhlasení' : 'Odsouhlasit — nepočítat jako nedostatek, nedávat do zpravodaje'}
               onClick={() => onToggle(i.text)}>{i.accepted ? 'zrušit' : 'odsouhlasit'}</button>
           )}
+          {onTakeName && i.czName && !i.accepted && (
+            <button className="issue-acc" title="Přepsat jméno na soupisce v aplikaci na zápis z chess.cz" onClick={() => onTakeName(i)}>převzít z chess.cz</button>
+          )}
         </div>
       ))}
     </div>
+  );
+}
+
+/** Confirms taking over the chess.cz name; a name of another person usually means a typo in the id. */
+export function takeName(p: RosterPlayer, i: Issue): boolean {
+  return i.level === 'warn' || window.confirm(
+    `Jméno „${p.name}“ nesouhlasí s ID — obvykle je chyba v čísle LOK / FIDE ID, ne ve jméně.\n\nOpravdu přepsat jméno na „${i.czName}“ (hráč s tímto ID na chess.cz)?`,
   );
 }
 
@@ -225,7 +275,8 @@ function IssueRow({ player: p, issues, onChanged }: { player: RosterPlayer; issu
       <td style={{ width: 220, fontWeight: 600 }}>{p.name}<div className="muted mono" style={{ fontSize: 12, fontWeight: 400 }}>{p.lok ? `LOK ${p.lok}` : 'bez LOK'}{flagText(p) && ` · ${flagText(p)}`}</div></td>
       <td>
         {p.struck ? <div className="issues"><div className="bad">vyškrtnut{p.struck_reason && `: ${p.struck_reason}`}</div></div>
-          : <IssueList issues={issues} onToggle={(text) => patch({ accepted_issues: toggleAccepted(issues, text) })} />}
+          : <IssueList issues={issues} onToggle={(text) => patch({ accepted_issues: toggleAccepted(issues, text) })}
+              onTakeName={(i) => takeName(p, i) && patch({ name: i.czName! })} />}
       </td>
       <td className="actions" style={{ width: 170 }}>
         {candidate?.czeId && !p.struck && (

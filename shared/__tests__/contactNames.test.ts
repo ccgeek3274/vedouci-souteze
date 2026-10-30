@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contactNameFindings } from '../roster/contactNames';
+import { contactNameFindings, fixContactNames } from '../roster/contactNames';
 
 const own = ['Novák Jan', 'Dvořák Petr', 'Černý Martin'];
 const others = ['Svoboda Tomáš', 'Martin Pavel'];
@@ -15,6 +15,13 @@ describe('contactNameFindings', () => {
     expect(f.map((x) => [x.index, x.suggestion])).toEqual([[0, 'Novák Jan'], [1, 'Svoboda Tomáš']]);
     expect(f[0].text).toContain('na soupisce „Novák Jan“');
     expect(f[1].text).toContain('jiného družstva');
+    expect(f.map((x) => x.kind)).toEqual(['swapped', 'swapped']);
+  });
+
+  it('fixes every contact with the same wrong name', () => {
+    const list = [ct('Jan Novák'), ct('Jan Novák', 'rozhodci'), ct('Petr Kopecký', 'rozhodci')];
+    const f = contactNameFindings(list, own, others).filter((x) => x.kind === 'swapped');
+    expect(fixContactNames(list, f).map((x) => x.name)).toEqual(['Novák Jan', 'Novák Jan', 'Petr Kopecký']);
   });
 
   it('flags "Jméno Příjmení" of people not on any roster by the first names on the rosters', () => {
