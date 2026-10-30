@@ -2,10 +2,10 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type C
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
-import { czDateTime, ROLE_LABEL } from '../../lib/format';
-import type { Contact } from '../../lib/types';
+import { czDateTime } from '../../lib/format';
 import { useCompetition } from './CompetitionLayout';
 import { RichEditor } from '../../components/RichEditor';
+import { RefPicker, refOptions } from '../../components/RefPicker';
 import { downloadBlob, SAVE_TEXT, saveTagClass, SavepointsCard, useBulletinDraft } from '../../bulletin/draft';
 import { loadRoundCz, refreshRoundCz, roundInput } from '../../bulletin/roundLoad';
 import { buildRoundDocxBlob } from '../../bulletin/roundDocx';
@@ -17,7 +17,6 @@ import {
   type RoundConfig, type RoundSnapshot,
 } from '../../../../shared/bulletin/round';
 import { asArray } from '../../../../shared/roster/verify';
-import { sameName } from '../../../../shared/schedule';
 import {
   HDR_DIST, MARGIN_B, MARGIN_T, MARGIN_X, matchCols, matchLayout, standingsLayout, sum, type Measure,
 } from '../../../../shared/bulletin/roundLayout';
@@ -53,84 +52,6 @@ const ptPx = (v: number) => `${(v * 4 / 3).toFixed(2)}px`;
 const css = (c?: string) => (c ? `#${c}` : '#000');
 const ruleCss = (c: string | undefined, w = 1): CSSProperties => (c ? { borderBottom: `${w}px solid ${css(c)}`, paddingBottom: 1 } : {});
 const Cols = ({ ws }: { ws: number[] }) => <colgroup>{ws.map((w, i) => <col key={i} style={{ width: px(w) }} />)}</colgroup>;
-
-// Referee suggestions: the team's referees, captain and deputy (in this order, each name once).
-type RefOption = { name: string; role: Contact['role'] };
-const REF_ROLES: Contact['role'][] = ['rozhodci', 'kapitan', 'zastupce'];
-function refOptions(contacts: Contact[] | undefined): RefOption[] {
-  const out: RefOption[] = [];
-  for (const role of REF_ROLES) {
-    for (const ct of contacts ?? []) {
-      const name = ct.name.trim();
-      if (ct.role === role && name && !out.some((o) => sameName(o.name, name))) out.push({ name, role });
-    }
-  }
-  return out;
-}
-
-/** Referee field of the preview: free text, ▾ opens the home team's people and, under a line, the away team's. */
-function RefPicker({ idx, value, changed, placeholder, title, home, away, onChange, onUndo }: {
-  idx: number; value: string; changed: boolean; placeholder?: string; title: string;
-  home: RefOption[]; away: RefOption[]; onChange: (v: string) => void; onUndo: () => void;
-}) {
-  const input = useRef<HTMLInputElement>(null);
-  const box = useRef<HTMLSpanElement>(null);
-  const [at, setAt] = useState<DOMRect | null>(null); // open menu: under the input (fixed — the cell clips overflow)
-  useEffect(() => {
-    if (!at) return;
-    const follow = () => input.current && setAt(input.current.getBoundingClientRect()); // the menu follows the field
-    const outside = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setAt(null); };
-    window.addEventListener('scroll', follow, true);
-    window.addEventListener('resize', follow);
-    document.addEventListener('mousedown', outside);
-    return () => {
-      window.removeEventListener('scroll', follow, true);
-      window.removeEventListener('resize', follow);
-      document.removeEventListener('mousedown', outside);
-    };
-  }, [!!at]);
-  const open = () => setAt(input.current!.getBoundingClientRect());
-  const pick = (name: string) => { onChange(name); setAt(null); input.current?.focus(); };
-  const group = (label: string, opts: RefOption[]) => (
-    <>
-      <li className="ref-menu-h">{label}</li>
-      {opts.length
-        ? opts.map((o) => (
-          <li key={`${label}${o.name}`}>
-            <button type="button" className={sameName(o.name, value) ? 'on' : undefined} onClick={() => pick(o.name)}>
-              {o.name}<span>{ROLE_LABEL[o.role]}</span>
-            </button>
-          </li>
-        ))
-        : <li className="ref-menu-none">bez kontaktů</li>}
-    </>
-  );
-  return (
-    <span className="rdoc-pick" ref={box}>
-      <input ref={input} className={`rdoc-ref${changed ? ' changed' : ''}`} data-ref={idx} value={value} spellCheck={false}
-        placeholder={placeholder} title={title}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowDown' || (e.key === 'Escape' && at)) { e.preventDefault(); if (at) setAt(null); else open(); return; }
-          if (e.key !== 'Enter') return;
-          e.preventDefault();
-          setAt(null);
-          const next = document.querySelector<HTMLInputElement>(`.rdoc-ref[data-ref="${idx + 1}"]`);
-          if (next) next.focus(); else e.currentTarget.blur();
-        }} />
-      <button type="button" className="rdoc-drop no-print" tabIndex={-1} title="Vybrat z rozhodčích, kapitánů a zástupců družstev"
-        onClick={() => (at ? setAt(null) : open())}>▾</button>
-      {changed && <button type="button" className="rdoc-undo no-print" title="Vrátit nominovaného" onClick={onUndo}>↺</button>}
-      {at && (
-        <ul className="ref-menu" style={{ left: at.left, top: at.bottom + 2, minWidth: Math.max(at.width, 220) }}>
-          {group('domácí', home)}
-          <li className="ref-menu-sep" role="separator" />
-          {group('hosté', away)}
-        </ul>
-      )}
-    </span>
-  );
-}
 
 // Zpravodaj z kola (M9): port of sscr-zpravodaj. Results, standings and the round's schedule from chess.cz,
 // referees from Nominace rozhodčích. The draft stores only the options and Různé; the referees as edited in the

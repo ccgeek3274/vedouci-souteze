@@ -4,6 +4,7 @@ import { api, apiErrorText } from '../../lib/api';
 import { czDate, czDateTime } from '../../lib/format';
 import { useCompetition } from './CompetitionLayout';
 import { loadChesscz } from '../../bulletin/load';
+import { RefPicker, refOptions } from '../../components/RefPicker';
 import { competitionSchedule, refKey, respelledReferees, rotatedReferees, sameName, scheduleRounds, teamReferees } from '../../../../shared/schedule';
 import { CONFLICT } from '../../../../shared/bulletin/initial';
 
@@ -143,6 +144,7 @@ export function Referees() {
   }).length, 0);
   const noRefTeams = (sched?.teams ?? []).filter((t) => !refsOf(t.key).length).map((t) => t.name);
   const publicUrl = `${location.origin}/rozpis/${c.id}`;
+  let fieldNo = 0; // running number of the referee fields (Enter → next)
   const cur = st.versions[0];
   const shown = viewingOld ? st.versions.find((v) => v.version === viewVersion) : cur;
 
@@ -251,7 +253,8 @@ export function Referees() {
                     {r.matches.map((m) => {
                       const key = refKey(r.nr, m.home);
                       const v = refs[key] ?? '';
-                      const home = refsOf(m.home), away = refsOf(m.away);
+                      const home = refsOf(m.home);
+                      const idx = fieldNo++;
                       const isForeign = !!v.trim() && !home.some((x) => sameName(x, v));
                       return (
                         <tr key={key}>
@@ -266,13 +269,11 @@ export function Referees() {
                           <td className="ref-cell">
                             {editing ? (
                               <>
-                                <input className={`input input-sm${isForeign ? ' ref-foreign' : ''}`} list={`ref-${key}`} value={v} placeholder="nenominován"
-                                  title={isForeign ? 'Není rozhodčím domácího družstva' : undefined}
-                                  onChange={(e) => { const val = e.target.value; setRefs({ ...draft.refs, [key]: val }, 'manual'); }} />
-                                <datalist id={`ref-${key}`}>
-                                  {home.map((o) => <option key={`h${o}`} value={o}>domácí</option>)}
-                                  {away.filter((o) => !home.includes(o)).map((o) => <option key={`a${o}`} value={o}>hosté</option>)}
-                                </datalist>
+                                {/* the same picker as in the zpravodaj z kola: home team's referees, captain, deputy | away team's */}
+                                <RefPicker idx={idx} value={v} placeholder="nenominován" inputClass={`input input-sm${isForeign ? ' ref-foreign' : ''}`}
+                                  title={isForeign ? 'Není rozhodčím domácího družstva' : 'Napsat jméno, nebo vybrat ▾ (šipka dolů)'}
+                                  home={refOptions(team.get(m.home)?.app?.contacts)} away={refOptions(team.get(m.away)?.app?.contacts)}
+                                  onChange={(val) => setRefs({ ...draft.refs, [key]: val }, 'manual')} />
                               </>
                             ) : v.trim()
                               ? <span className={isForeign ? 'ref-foreign' : undefined} title={isForeign ? 'Není rozhodčím domácího družstva' : undefined}>{v}</span>

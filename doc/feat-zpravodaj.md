@@ -1,6 +1,6 @@
 # Úvodní zpravodaj (M8)
 
-Záložka **Zpravodaj** soutěže. Port generátoru `../uvodni-zpravodaj` (DOCX) rozšířený o kapitoly ze skutečného
+Záložka **Zpravodaje** soutěže. Port generátoru `../uvodni-zpravodaj` (DOCX) rozšířený o kapitoly ze skutečného
 zpravodaje RPB 2026/27 (`doc/rpb_26_27_uz_v3.docx`) a o PDF (pdfmake + Carlito jako `../sscr-zpravodaj`).
 
 ## Rozhodnutí (potvrzeno uživatelem)

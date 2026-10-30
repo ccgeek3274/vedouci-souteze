@@ -54,3 +54,8 @@ jméno podle `sameName`, jiný zápis — pořadí slov, diakritika, velikost p�
 pak ostatních družstev) a ukáže varování s tlačítkem **Aktualizovat jména podle kontaktů**. Uložení = nová verze se
 zdrojem `names` („aktualizace jmen“); mění se jen zápis jmen, kdo píská které utkání, zůstává. Při save pointu
 úvodního zpravodaje se ptá jako ostatní změny. Jen v zobrazení aktuální verze (ne při úpravě / staré verzi).
+
+## Výběr rozhodčího při úpravě (30. 10. 2026)
+Pole rozhodčího v editaci má stejné menu jako náhled zpravodaje z kola (`web/src/components/RefPicker.tsx`, sdílená
+komponenta): ▾ nebo šipka dolů → rozhodčí, kapitán a zástupce domácích, pod čarou hostů (každé jméno jednou,
+`refOptions`), nebo libovolné jméno ručně; Enter přejde na další utkání. Dříve `<datalist>` jen s rozhodčími.

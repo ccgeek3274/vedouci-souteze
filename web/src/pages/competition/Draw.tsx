@@ -228,36 +228,40 @@ function Schedule({ teams }: { teams: (TeamWithSummary & { draw_no: number | nul
       <div className="card-strip"><h2>Rozlosování</h2><span className="helper">Bergerovy tabulky, {rounds.length} kol</span></div>
       <div className="card-body table-scroll">
         {missingDates && <div className="note warn">Kalendář má jen {data.rounds.length} termínů, rozlosování {rounds.length} kol.</div>}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '6px 28px' }}>
+        {/* one box per round: number + date in the head, each match home over away (names do not wrap into each other) */}
+        <div className="sched-grid">
           {rounds.map((ms, r) => {
             const last = r === rounds.length - 1;
+            const date = dateOf(r + 1);
             return (
-              <div key={r} style={{ breakInside: 'avoid' }}>
-                <div className="section-title" style={{ marginTop: 14 }}>{r + 1}. kolo {dateOf(r + 1) && <span className="muted">— {czDate(dateOf(r + 1), true)}</span>}</div>
-                <table className="table" style={{ fontSize: 13.5 }}>
-                  <tbody>
-                    {ms.map((m) => {
-                      const h = m.home ? byId.get(m.home)! : null;
-                      const a = m.away ? byId.get(m.away)! : null;
-                      if (!h || !a) {
-                        const t = h ?? a;
-                        return t ? <tr key={m.board}><td colSpan={3} className="muted"><TeamName id={t.id} name={t.name} /> — volno</td></tr> : null;
-                      }
-                      const st = matchStart(h, a, c.default_start, { nr: r + 1, last, lastStart: c.last_start });
-                      return (
-                        <tr key={m.board}>
-                          <td><span className="mono muted">{h.draw_no}</span> <TeamName id={h.id} name={h.name} /></td>
-                          <td><span className="mono muted">{a.draw_no}</span> <TeamName id={a.id} name={a.name} /></td>
-                          <td className="mono" style={{ whiteSpace: 'nowrap', width: 60 }}>
-                            {st.conflict ? <span className="tag bad" title="Domácí a hosté mají různé výjimky">???</span>
-                              : st.exception ? <b>{shortTime(st.time)}</b> : <span className="muted">{shortTime(st.time)}</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <section key={r} className="sched-round">
+                <header className="sched-head">
+                  <span className="sched-nr">{r + 1}. kolo</span>
+                  <span className="sched-date">{date ? czDate(date, true) : 'bez termínu'}</span>
+                </header>
+                {ms.map((m) => {
+                  const h = m.home ? byId.get(m.home)! : null;
+                  const a = m.away ? byId.get(m.away)! : null;
+                  if (!h || !a) {
+                    const t = h ?? a;
+                    return t ? <div key={m.board} className="sched-match sched-bye"><span className="sched-board" /><span><span className="mono muted">{t.draw_no}</span> <TeamName id={t.id} name={t.name} /> — volno</span></div> : null;
+                  }
+                  const st = matchStart(h, a, c.default_start, { nr: r + 1, last, lastStart: c.last_start });
+                  return (
+                    <div key={m.board} className="sched-match">
+                      <span className="sched-board mono">{m.board}.</span>
+                      <span className="sched-teams">
+                        <span><span className="mono muted">{h.draw_no}</span> <TeamName id={h.id} name={h.name} /></span>
+                        <span><span className="mono muted">{a.draw_no}</span> <TeamName id={a.id} name={a.name} /></span>
+                      </span>
+                      <span className="sched-time mono">
+                        {st.conflict ? <span className="tag bad" title="Domácí a hosté mají různé výjimky">???</span>
+                          : st.exception ? <b>{shortTime(st.time)}</b> : <span className="muted">{shortTime(st.time)}</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </section>
             );
           })}
         </div>
@@ -274,7 +278,7 @@ function Schedule({ teams }: { teams: (TeamWithSummary & { draw_no: number | nul
             ))}
           </tbody>
         </table>
-        <p className="helper-text">D = doma, V = venku, – = volno. Tučný čas = výjimka ze začátku; ??? = domácí i hosté mají různou výjimku (rozhodnout na schůzi).</p>
+        <p className="helper-text">V kole je u každého utkání nahoře domácí, pod ním hosté. D = doma, V = venku, – = volno. Tučný čas = výjimka ze začátku; ??? = domácí i hosté mají různou výjimku (rozhodnout na schůzi).</p>
       </div>
     </div>
   );

@@ -48,3 +48,9 @@ Během losování není známo, které číslo zůstane prázdné (volno) — po
 Po kolech s datem z kalendáře, začátek utkání podle `matchStart` (`shared/startTime.ts`, jako `matchTime`
 v uvodni-zpravodaj): výjimka domácích doma / hostů venku, různé výjimky = `???`, poslední kolo vždy výchozí začátek.
 Mřížka doma/venku po kolech. Rozlosování se zatím neukládá (počítá se z čísel); po importu do chess.cz je pravdou chess.cz.
+
+## Rozpis kol (30. 10. 2026)
+Rozlosování na kartě Losování: každé kolo je samostatný rámeček s výraznou hlavičkou (číslo kola vlevo, datum vpravo,
+silná čára pod ní), utkání oddělená linkou, u utkání **domácí nahoře (tučně), hosté pod ním** — dlouhé názvy klubů se
+nezalamují do sebe; čas vpravo (tučně výjimka, ??? konflikt). Mřížka `.sched-grid` (min. 300 px na kolo, na mobilu
+pod sebou).

@@ -436,3 +436,20 @@ table.pub-current { outline: 2px solid var(--danger); outline-offset: -1px; }
 .pgdoc .pg-gap { position: absolute; left: -2px; right: -2px; background: var(--screen); display: flex; align-items: center;
   justify-content: flex-end; padding: 0 6px; font: 11px/1 var(--mono); color: var(--subtitle); }
 .pgdoc .pg-hdr { position: absolute; margin: 0; } /* left / right = the page margin (paginate) */
+
+/* Losování: schedule — one box per round, the head stands out, each match home over away */
+.sched-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 4px; }
+.sched-round { border: 1px solid var(--divider); border-radius: var(--radius); background: var(--paper); overflow: hidden; break-inside: avoid; }
+.sched-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 7px 12px;
+  background: var(--highlight); border-bottom: 2px solid var(--ink); }
+.sched-nr { font: 700 15px var(--sans); }
+.sched-date { font: 600 13px var(--mono); }
+.sched-match { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; padding: 6px 12px; font-size: 13.5px; }
+.sched-match + .sched-match { border-top: 1px solid var(--divider); }
+.sched-board { color: var(--muted); font-size: 12px; }
+.sched-teams { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sched-teams > span:first-child { font-weight: 600; }
+.sched-time { white-space: nowrap; font-size: 12.5px; }
+.sched-bye { color: var(--muted); }
+.ref-cell .rdoc-pick { display: flex; align-items: center; width: 100%; }
+.ref-cell .rdoc-pick input { flex: 1; min-width: 0; }

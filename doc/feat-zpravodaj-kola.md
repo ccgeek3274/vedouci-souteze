@@ -1,6 +1,6 @@
 # Zpravodaje z kol (M9)
 
-Záložka **Zpravodaj** má v hlavičce přepínač *Úvodní · 1. kolo · 2. kolo …* (`/c/:id/zpravodaj/uvodni`,
+Záložka **Zpravodaje** má v hlavičce přepínač *Úvodní · 1. kolo · 2. kolo …* (`/c/:id/zpravodaj/uvodni`,
 `/zpravodaj/kolo-N`). Port generátoru `../sscr-zpravodaj` (jednosouborová aplikace) adaptovaný na soutěž v aplikaci.
 Úvodní zpravodaj viz `doc/feat-zpravodaj.md`.
 
