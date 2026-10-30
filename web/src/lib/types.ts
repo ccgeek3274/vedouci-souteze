@@ -10,6 +10,11 @@ export type CompetitionListItem = Pick<Competition, 'id' | 'season' | 'short' | 
   team_count: number; roster_count: number;
 };
 export type Round = { round: number; date: string; note: string };
+/** GET /competitions/:id/bulletins — a bulletin with a draft (updated_at) or save points; key 'initial' / 'round-N'. */
+export type BulletinSummary = {
+  key: string; updated_at: number | null; kind: string | null;
+  savepoints: number; last_label: string | null; last_at: number | null;
+};
 export type Contact = { id?: number; role: 'kapitan' | 'zastupce' | 'komunikace' | 'rozhodci'; position?: number; name: string; phone: string; email: string };
 export type Team = {
   id: string; competition_id: string; name: string; club_name: string; club_code: string | null;

@@ -1,9 +1,29 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
-import { czDate, LEVEL_LABEL, PHASE_LABEL, roundCount } from '../../lib/format';
-import type { Competition, Round } from '../../lib/types';
+import { czDate, czDateTime, LEVEL_LABEL, PHASE_LABEL, roundCount } from '../../lib/format';
+import type { BulletinSummary, Competition, Round } from '../../lib/types';
+import { chessczGet } from '../../lib/rosterCheck';
+import { chessczUrl } from '../../../../shared/bulletin/initial';
 import { useCompetition } from './CompetitionLayout';
+
+/** State of a bulletin for Přehled: last save point (what was sent out), else whether a draft exists. */
+function BulletinState({ b, initial = false }: { b: BulletinSummary | undefined; initial?: boolean }) {
+  if (!b) return <span className="muted">nezahájen</span>;
+  const kind = initial && b.kind ? (b.kind === 'definitive' ? 'definitivní' : 'předběžný') : null;
+  return (
+    <span className="bstate">
+      {kind && <span className="tag">{kind}</span>}
+      {b.savepoints
+        ? <span className="tag ok" title={`Save pointů: ${b.savepoints}`}>save point{b.last_label ? ` „${b.last_label}“` : ''} · {czDateTime(b.last_at!)}</span>
+        : <span className="tag warn">bez save pointu</span>}
+      {b.updated_at != null && <span className="muted">koncept {czDateTime(b.updated_at)}</span>}
+    </span>
+  );
+}
+
+const ExtLink = ({ url }: { url: string }) => <a href={url} target="_blank" rel="noreferrer">{url}</a>;
 
 const FIELDS: { key: keyof Competition; label: string; mono?: boolean; wide?: boolean }[] = [
   { key: 'name', label: 'Název' },
@@ -52,6 +72,16 @@ export function Overview() {
   };
 
   const teams = data.teams.filter((t) => t.status === 'active').length;
+  const bulletins = useQuery({ queryKey: ['bulletins', c.id], queryFn: () => api.get<{ bulletins: BulletinSummary[] }>(`/competitions/${c.id}/bulletins`) });
+  const byKey = new Map((bulletins.data?.bulletins ?? []).map((b) => [b.key, b]));
+  // chess-results link of the competition: from chess.cz details (proxy cache), as in the bulletins
+  const details = useQuery({
+    queryKey: ['chesscz-details', c.chesscz_comp_id],
+    queryFn: () => chessczGet(`/competitions/${c.chesscz_comp_id}/details`) as Promise<{ compWww?: string } | null>,
+    enabled: !!c.chesscz_comp_id,
+    staleTime: 60 * 60_000,
+  });
+  const publicUrl = `${location.origin}/rozpis/${c.id}`;
   return (
     <>
       <div className="card">
@@ -94,16 +124,23 @@ export function Overview() {
                 <FragmentRow key={f.key} label={f.label} value={f.key === 'mutual_deadline' ? czDate(c.mutual_deadline) : f.key === 'last_start' && !c.last_start ? `výchozí (${c.default_start})` : String(c[f.key] ?? '')} mono={f.mono} />
               ))}
               {c.notes && <FragmentRow label="Poznámky" value={c.notes} />}
+              {/* links of the competition as in the bulletins + the published schedule + state of the úvodní zpravodaj */}
+              <FragmentRow label="Soutěž na chess.cz" value={c.chesscz_comp_id ? <ExtLink url={chessczUrl(c.chesscz_comp_id)} /> : ''} />
+              <FragmentRow label="Chess-results" value={details.data?.compWww ? <ExtLink url={details.data.compWww} />
+                : details.isLoading && c.chesscz_comp_id ? <span className="muted">načítám…</span> : ''} />
+              <FragmentRow label="Zveřejněné rozlosování" value={c.published ? <ExtLink url={publicUrl} />
+                : <span className="muted">nezveřejněno — zapíná se na kartě <Link to="rozhodci">Nominace rozhodčích</Link></span>} />
+              <FragmentRow label="Úvodní zpravodaj" value={<><Link to="zpravodaj/uvodni">otevřít</Link> <BulletinState b={byKey.get('initial')} initial /></>} />
             </dl>
           )}
         </div>
       </div>
-      <Rounds rounds={data.rounds} competitionId={c.id} teams={teams} onSaved={refresh} />
+      <Rounds rounds={data.rounds} competitionId={c.id} teams={teams} onSaved={refresh} bulletins={byKey} />
     </>
   );
 }
 
-function FragmentRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function FragmentRow({ label, value, mono }: { label: string; value: ReactNode; mono?: boolean }) {
   return (
     <>
       <dt>{label}</dt>
@@ -112,7 +149,9 @@ function FragmentRow({ label, value, mono }: { label: string; value: string; mon
   );
 }
 
-function Rounds({ rounds, competitionId, teams, onSaved }: { rounds: Round[]; competitionId: string; teams: number; onSaved: () => Promise<void> }) {
+function Rounds({ rounds, competitionId, teams, onSaved, bulletins }: {
+  rounds: Round[]; competitionId: string; teams: number; onSaved: () => Promise<void>; bulletins: Map<string, BulletinSummary>;
+}) {
   const [edit, setEdit] = useState(false);
   const [rows, setRows] = useState<Round[]>(rounds);
   const [error, setError] = useState<string | null>(null);
@@ -150,7 +189,7 @@ function Rounds({ rounds, competitionId, teams, onSaved }: { rounds: Round[]; co
         {!rows.length && !edit && <p className="muted">Termíny zatím nejsou zadané — naimportujte rozpis nebo je doplňte ručně.</p>}
         {(rows.length > 0 || edit) && (
           <table className="table">
-            <thead><tr><th>Kolo</th><th>Datum</th><th>Poznámka</th>{edit && <th />}</tr></thead>
+            <thead><tr><th>Kolo</th><th>Datum</th><th>Poznámka</th>{edit ? <th /> : <th>Zpravodaj z kola</th>}</tr></thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={i} className={!edit && needed && r.round > needed ? 'reserve' : undefined}>
@@ -161,7 +200,9 @@ function Rounds({ rounds, competitionId, teams, onSaved }: { rounds: Round[]; co
                   <td>{edit
                     ? <input className="input input-sm" style={{ width: '100%' }} value={r.note} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)))} />
                     : r.note || (needed && r.round > needed ? <span className="muted">nevyužito (méně družstev)</span> : '')}</td>
-                  {edit && <td className="actions"><button className="icon-btn" title="Odebrat" onClick={() => setRows(rows.filter((_, j) => j !== i))}>✕</button></td>}
+                  {edit
+                    ? <td className="actions"><button className="icon-btn" title="Odebrat" onClick={() => setRows(rows.filter((_, j) => j !== i))}>✕</button></td>
+                    : <td>{(!needed || r.round <= needed) && <><Link to={`zpravodaj/kolo-${i + 1}`}>{i + 1}. kolo</Link> <BulletinState b={bulletins.get(`round-${i + 1}`)} /></>}</td>}
                 </tr>
               ))}
             </tbody>

@@ -84,7 +84,7 @@ export function Draw() {
                 const done = assign.has(x.id) && assign.has(y.id);
                 const r = done ? table(size).meeting(x.draw_no!, y.draw_no!).round : null;
                 return (
-                  <li key={x.id + y.id}><TeamName id={x.id} name={x.name} /> – <TeamName id={y.id} name={y.name} />{' '}
+                  <li key={x.id + y.id}>{x.name} – {y.name}{' '}
                     {v ? <span className="tag bad">{v.text}</span> : done ? <span className="tag ok">{r}. kolo — splněno</span> : <span className="tag">čeká na losovací čísla</span>}
                   </li>
                 );
@@ -181,7 +181,7 @@ function Documents({ teams, deadline }: { teams: TeamWithSummary[]; deadline: st
             {teams.map((t, i) => (
               <tr key={t.id} style={{ verticalAlign: 'top' }}>
                 <td className="mono muted">{i + 1}.</td>
-                <td><TeamName id={t.id} name={t.name} link bold /></td>
+                <td><TeamName id={t.id} name={t.name} bold /></td>
                 <td style={{ fontSize: 13.5 }}>
                   {reqs(t.id).map((r) => (
                     <div key={r.id} style={{ marginBottom: 3 }}>
@@ -244,15 +244,16 @@ function Schedule({ teams }: { teams: (TeamWithSummary & { draw_no: number | nul
                   const a = m.away ? byId.get(m.away)! : null;
                   if (!h || !a) {
                     const t = h ?? a;
-                    return t ? <div key={m.board} className="sched-match sched-bye"><span className="sched-board" /><span><span className="mono muted">{t.draw_no}</span> <TeamName id={t.id} name={t.name} /> — volno</span></div> : null;
+                    return t ? <div key={m.board} className="sched-match sched-bye"><span className="sched-board" /><span><span className="sched-no mono muted">{t.draw_no}</span>{t.name} — volno</span></div> : null;
                   }
                   const st = matchStart(h, a, c.default_start, { nr: r + 1, last, lastStart: c.last_start });
                   return (
                     <div key={m.board} className="sched-match">
                       <span className="sched-board mono">{m.board}.</span>
                       <span className="sched-teams">
-                        <span><span className="mono muted">{h.draw_no}</span> <TeamName id={h.id} name={h.name} /></span>
-                        <span><span className="mono muted">{a.draw_no}</span> <TeamName id={a.id} name={a.name} /></span>
+                        {/* a match listing: plain names, no roster icons */}
+                        <span><span className="sched-no mono muted">{h.draw_no}</span>{h.name}</span>
+                        <span><span className="sched-no mono muted">{a.draw_no}</span>{a.name}</span>
                       </span>
                       <span className="sched-time mono">
                         {st.conflict ? <span className="tag bad" title="Domácí a hosté mají různé výjimky">???</span>
@@ -272,7 +273,7 @@ function Schedule({ teams }: { teams: (TeamWithSummary & { draw_no: number | nul
           <tbody>
             {sorted.map((t) => (
               <tr key={t.id}>
-                <td style={{ textAlign: 'left', fontFamily: 'var(--sans)', fontWeight: 500 }}><span className="mono muted">{t.draw_no}</span> <TeamName id={t.id} name={t.name} /></td>
+                <td style={{ textAlign: 'left', fontFamily: 'var(--sans)', fontWeight: 500 }}><span className="sched-no mono muted">{t.draw_no}</span><TeamName id={t.id} name={t.name} /></td>
                 {T.homes(t.draw_no!, empty).map((h, r) => <td key={r} className={h ? 'h' : ''}>{h === null ? '–' : h ? 'D' : 'V'}</td>)}
               </tr>
             ))}

@@ -57,7 +57,7 @@ export function Teams() {
                   <tr key={t.id}>
                     <td className="mono muted">{i + 1}.</td>
                     <td>
-                      <TeamName id={t.id} name={t.name} link bold />
+                      <TeamName id={t.id} name={t.name} bold />
                       {t.chesscz_team_id && chessczName.get(t.chesscz_team_id) && fold(chessczName.get(t.chesscz_team_id)) !== fold(t.name) && (
                         <div className="muted" style={{ fontSize: 12.5 }}>chess.cz: {chessczName.get(t.chesscz_team_id)}</div>
                       )}
@@ -96,7 +96,7 @@ export function Teams() {
               <tbody>
                 {reserve.map((t) => (
                   <tr key={t.id} className="reserve">
-                    <td><TeamName id={t.id} name={t.name} link /></td>
+                    <td><TeamName id={t.id} name={t.name} /></td>
                     <td>{t.roster ? `${t.roster.players} hráčů` : ''}</td>
                     <td className="actions"><button className="btn btn-small" onClick={() => setStatus(t, 'active')}>Vrátit do soutěže</button></td>
                   </tr>

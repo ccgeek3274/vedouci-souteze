@@ -51,6 +51,7 @@ Mřížka doma/venku po kolech. Rozlosování se zatím neukládá (počítá se
 
 ## Rozpis kol (30. 10. 2026)
 Rozlosování na kartě Losování: každé kolo je samostatný rámeček s výraznou hlavičkou (číslo kola vlevo, datum vpravo,
-silná čára pod ní), utkání oddělená linkou, u utkání **domácí nahoře (tučně), hosté pod ním** — dlouhé názvy klubů se
-nezalamují do sebe; čas vpravo (tučně výjimka, ??? konflikt). Mřížka `.sched-grid` (min. 300 px na kolo, na mobilu
+silná čára pod ní), utkání oddělená linkou, u utkání **domácí nahoře, hosté pod ním** (stejné písmo) — dlouhé názvy
+klubů se nezalamují do sebe; losovací čísla zarovnaná vpravo na dvě číslice (`.sched-no`), názvy bez ikony soupisky
+(rozpis zápasů); čas vpravo (tučně výjimka, ??? konflikt). Mřížka `.sched-grid` (min. 300 px na kolo, na mobilu
 pod sebou).

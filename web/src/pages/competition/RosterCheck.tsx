@@ -175,7 +175,7 @@ function TeamCheck({ team, issues, busy, onCheck, onChanged, contacts, nameFindi
   return (
     <div className="card">
       <div className="card-strip">
-        <h2 style={{ textTransform: 'none' }}><TeamName id={team.id} name={team.name} link /></h2>
+        <h2 style={{ textTransform: 'none' }}><TeamName id={team.id} name={team.name} /></h2>
         <span className="helper">
           {team.club_code ? `oddíl ${team.club_code}${team.club_name ? ` · ${team.club_name}` : ''}` : 'oddíl neurčen'}
           {players.length > 0 && (at ? ` · ověřeno ${czDateTime(at)}` : ' · neověřeno')}

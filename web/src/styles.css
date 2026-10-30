@@ -448,8 +448,10 @@ table.pub-current { outline: 2px solid var(--danger); outline-offset: -1px; }
 .sched-match + .sched-match { border-top: 1px solid var(--divider); }
 .sched-board { color: var(--muted); font-size: 12px; }
 .sched-teams { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.sched-teams > span:first-child { font-weight: 600; }
 .sched-time { white-space: nowrap; font-size: 12.5px; }
 .sched-bye { color: var(--muted); }
+/* draw numbers 1–2 digits right-aligned, the names start in one column */
+.sched-no { display: inline-block; min-width: 2ch; text-align: right; margin-right: 6px; }
 .ref-cell .rdoc-pick { display: flex; align-items: center; width: 100%; }
 .ref-cell .rdoc-pick input { flex: 1; min-width: 0; }
+.bstate { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-left: 6px; font-size: 12.5px; }

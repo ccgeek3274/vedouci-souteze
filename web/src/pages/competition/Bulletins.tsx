@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, NavLink, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
+import type { BulletinSummary } from '../../lib/types';
 import { useCompetition } from './CompetitionLayout';
 import { loadChesscz } from '../../bulletin/load';
 import { todayIso } from '../../../../shared/bulletin/initial';
@@ -22,7 +23,7 @@ export function Bulletins() {
   const c = detail.competition;
   const base = `/c/${c.id}/zpravodaj`;
 
-  const list = useQuery({ queryKey: ['bulletins', c.id], queryFn: () => api.get<{ bulletins: { key: string }[] }>(`/competitions/${c.id}/bulletins`) });
+  const list = useQuery({ queryKey: ['bulletins', c.id], queryFn: () => api.get<{ bulletins: BulletinSummary[] }>(`/competitions/${c.id}/bulletins`) });
   // Round dates come with the competition; only when it has none (no rozpis imported) from the chess.cz schedule.
   const needCz = !detail.rounds.length && !!c.chesscz_comp_id;
   const czSched = useQuery({
@@ -46,7 +47,7 @@ export function Bulletins() {
   const nr = /^kolo-(\d{1,2})$/.exec(key)?.[1];
   if (key !== 'uvodni' && !nr) return <Navigate to={base} replace />;
 
-  const saved = new Set((list.data?.bulletins ?? []).map((b) => b.key));
+  const saved = new Set((list.data?.bulletins ?? []).filter((b) => b.updated_at != null).map((b) => b.key));
   const mark = (k: string) => (saved.has(k) ? <span className="bsw-saved" title="Koncept uložen">•</span> : null);
   const cls = (k: string) => `chip${k === autoKey ? ' bsw-auto' : ''}`;
 

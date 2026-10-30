@@ -64,3 +64,11 @@ pořadí nehraje roli; více řádků = více kontaktů se stejnou rolí. Funguj
   nastavuje přijatý požadavek na začátek. Pole `start_pref` / `draw_requests` z importu soupisky slouží jen jako zdroj požadavků.
 - Přezůvky: přepínač Ano/Ne, ukládá se `ano` / `ne` (starší hodnoty z e-soupisek „NE“, „ano“ se čtou tolerantně).
 - V soutěži se místo velké hlavičky aplikace zobrazuje nahoře název soutěže, navigace aplikace je zmenšená vpravo.
+
+## Přehled soutěže: odkazy a stav zpravodajů (30. 10. 2026)
+Karta *Údaje soutěže* ukazuje navíc (jen při zobrazení): odkaz na soutěž na chess.cz (`chessczUrl`), Chess-results
+(`compWww` z chess.cz details přes proxy, jako ve zpravodaji), zveřejněné rozlosování (`/rozpis/:id`, jinak „nezveřejněno“
+s odkazem na Nominace rozhodčích) a úvodní zpravodaj (odkaz + předběžný/definitivní, poslední save point, čas konceptu).
+*Termíny kol* mají sloupec *Zpravodaj z kola* (odkaz + stav) pro využitá kola. Stav = `GET /competitions/:id/bulletins`
+(rozšířeno: `updated_at` konceptu nebo null, `kind`, počet save pointů, poslední `last_label` / `last_at`);
+„bez save pointu“ = koncept existuje, ale nic nebylo zmrazeno, „nezahájen“ = nic.

@@ -228,7 +228,7 @@ export function RequestTable({ requests, showTeam = true, showKind = true, state
         return (
           <div key={r.id} className={`req-row${showTeam ? ' with-team' : ''}`}>
             {showTeam && (
-              <div className="req-team">{r.team_id ? <TeamName id={r.team_id} name={name(r.team_id)} link /> : <span className="muted">celá soutěž</span>}</div>
+              <div className="req-team">{r.team_id ? <TeamName id={r.team_id} name={name(r.team_id)} /> : <span className="muted">celá soutěž</span>}</div>
             )}
             <div className="req-main">
               <div>{showKind && <span className="req-kind">{REQUEST_KIND_LABEL[r.kind]}</span>}{summary}</div>

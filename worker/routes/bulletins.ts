@@ -41,8 +41,17 @@ const withoutSnapshot = (config: string) => {
 bulletins.get('/competitions/:id/bulletins', async (c) => {
   const comp = await ownedCompetition(c, c.req.param('id') ?? '');
   if (!comp) return c.json({ error: 'Soutěž nenalezena' }, 404);
-  const { results } = await c.env.DB.prepare('SELECT key, updated_at FROM bulletins WHERE competition_id = ? ORDER BY key')
-    .bind(comp.id).all<{ key: string; updated_at: number }>();
+  // every bulletin with a draft or a save point: draft time (null = only save points), kind of the úvodní zpravodaj,
+  // number of save points and the last one (Přehled shows the state, the switcher marks saved drafts)
+  const { results } = await c.env.DB.prepare(
+    `SELECT k.key, b.updated_at, json_extract(b.config, '$.kind') AS kind,
+       (SELECT count(*) FROM bulletin_savepoints s WHERE s.competition_id = ?1 AND s.key = k.key) AS savepoints,
+       (SELECT label FROM bulletin_savepoints s WHERE s.competition_id = ?1 AND s.key = k.key ORDER BY created_at DESC, id DESC LIMIT 1) AS last_label,
+       (SELECT created_at FROM bulletin_savepoints s WHERE s.competition_id = ?1 AND s.key = k.key ORDER BY created_at DESC, id DESC LIMIT 1) AS last_at
+     FROM (SELECT key FROM bulletins WHERE competition_id = ?1 UNION SELECT key FROM bulletin_savepoints WHERE competition_id = ?1) k
+     LEFT JOIN bulletins b ON b.competition_id = ?1 AND b.key = k.key
+     ORDER BY k.key`,
+  ).bind(comp.id).all();
   return c.json({ bulletins: results });
 });
 
