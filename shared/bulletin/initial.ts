@@ -345,11 +345,11 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
       }],
     },
     { title: 'Soupisky družstev', pageBreak: true, sections: [{ type: 'rosters', teams: rosters }] },
+    { title: 'Rozlosování soutěže', sections: [{ type: 'rounds', rounds, withRef: cfg.withRef }] },
     ...(definitive ? [] : [{
       title: 'Nedostatky soupisek',
       sections: [rich('deficiencies')], // generated from the roster check, editable
     }]),
-    { title: 'Rozlosování soutěže', sections: [{ type: 'rounds', rounds, withRef: cfg.withRef }] },
     { title: 'Specifické požadavky', sections: [{ type: 'lines', lines: requirementLines }, rich('requirements')] },
     { title: 'Rozhodčí', sections: [rich('referees')] },
     { title: 'Další oznámení', sections: [rich('announcements')] },

@@ -14,7 +14,7 @@ import {
 } from '../../../../shared/bulletin/initial';
 import {
   CAL_COL, CAL_GAP, CONTACT_COLS, GAP_PARA_H, HDR_DIST, ROSTER_TITLE_H, INTRO_ID, MARGIN_X, MARGIN_Y, ROSTER_COLS, ROSTER_GAP, ROSTER_PAIR_GAP, ROSTER_W,
-  VENUE_COLS, pairs, schedCols, sectionId,
+  VENUE_COLS, VENUE_ROW_H, CONTACT_ROW_H, pairs, schedCols, sectionId,
 } from '../../bulletin/layout';
 import { downloadBlob, SAVE_TEXT, saveTagClass, SavepointsCard, useBulletinDraft } from '../../bulletin/draft';
 
@@ -232,14 +232,14 @@ function SectionView({ s, id, cfg, update, version }: {
       return (
         <>{s.rows.map((r, i) => (
           <table key={i} className="d-tbl d-row" data-pg={`${id}${i}`}><Cols ws={VENUE_COLS} /><tbody>
-            <tr><td className="c">{r.stc}</td><td className="b">{r.name}</td><td>{r.venue || <span className="d-missing">chybí hrací místnost</span>}</td></tr>
+            <tr style={{ height: px(VENUE_ROW_H) }}><td className="c">{r.stc}</td><td>{r.name}</td><td>{r.venue || <span className="d-missing">chybí hrací místnost</span>}</td></tr>
           </tbody></table>
         ))}</>
       );
     case 'contacts': {
       let k = 0; // row index as in the PDF table (team row + its contacts)
       const row = (key: string | undefined, cells: React.ReactNode) => (
-        <table key={key ?? `x${k}`} className="d-tbl d-row" data-pg={key} data-pg-ghost={key ? undefined : ''}><Cols ws={CONTACT_COLS} /><tbody><tr>{cells}</tr></tbody></table>
+        <table key={key ?? `x${k}`} className="d-tbl d-row" data-pg={key} data-pg-ghost={key ? undefined : ''}><Cols ws={CONTACT_COLS} /><tbody><tr style={{ height: px(CONTACT_ROW_H) }}>{cells}</tr></tbody></table>
       );
       return (
         <>{s.teams.map((t) => (

@@ -6,7 +6,7 @@ import type { RichBlock } from '../../../shared/bulletin/rich';
 import { richId } from './paginate';
 import {
   C_BORDER, C_CAL, C_SUB, C_TIME, C_WKND, CAL_COL, CAL_GAP, CONTACT_COLS, MARGIN_X, MARGIN_Y, HDR_DIST,
-  ROSTER_COLS, ROSTER_GAP, ROSTER_HDRS, ROSTER_PAIR_GAP, ROSTER_W, ROSTER_ROW_H, ROSTER_TITLE_H, GAP_PARA_H, cellLine, SCHED_HDRS, VENUE_COLS, contactRows, INTRO_ID, pairs, schedCols, sectionId,
+  ROSTER_COLS, ROSTER_GAP, ROSTER_HDRS, ROSTER_PAIR_GAP, ROSTER_W, ROSTER_ROW_H, VENUE_ROW_H, CONTACT_ROW_H, ROSTER_TITLE_H, GAP_PARA_H, cellLine, SCHED_HDRS, VENUE_COLS, contactRows, INTRO_ID, pairs, schedCols, sectionId,
 } from './layout';
 
 const pt = (dxa: number) => dxa / 20;
@@ -14,6 +14,7 @@ const PAD = 2.5;
 const LINE = 0.5;
 const FS = 12;
 const widths = (ws: number[]) => ws.map((w) => Math.max(4, pt(w) - 2 * PAD - LINE));
+/** Calendar cells (fixed square rows). */
 const LAYOUT = {
   hLineWidth: () => LINE, vLineWidth: () => LINE,
   hLineColor: () => `#${C_BORDER}`, vLineColor: () => `#${C_BORDER}`,
@@ -23,6 +24,15 @@ const NO_LINES = { ...LAYOUT, hLineWidth: () => 0, vLineWidth: () => 0 };
 const SUB = `#${C_SUB}`;
 /** Carlito's natural line (lineHeight 1) = 2500 / 2048 of the font size. */
 const NATURAL_LINE = 2500 / 2048;
+/**
+ * Other tables as the DOCX (and the approved bulletin rpb_26_27_uz): no vertical cell padding, the text line exactly
+ * 12 pt × 1.2 = 14.4 pt → a row is 14.4 pt + line (6 rounds of 5 matches per page).
+ */
+const CELL_LINE = cellLine() / 20;
+const CELL_LH = CELL_LINE / (FS * NATURAL_LINE);
+const TABLE = { ...LAYOUT, paddingTop: () => 0, paddingBottom: () => 0 };
+/** Rows of a fixed height (DXA, incl. the line) with the text vertically centred. */
+const fixedRows = (h: number) => ({ heights: pt(h) - LINE });
 
 // Node ids (data-pg in the preview, for its page breaks): t* titles, h* chapters, sections `i.` (intro) / `s{ch}.{n}.`
 // + order of the item (paragraph, line, table row, roster / calendar pair, round, link).
@@ -54,8 +64,7 @@ function rich(blocks: RichBlock[], id: string): any[] {
 
 // Rosters as in the DOCX (fixed rows): the name in a ROSTER_TITLE_H band (text at the bottom), every row ROSTER_ROW_H
 // with the text line exactly 12 pt × 1.2 → 2 pairs of rosters with 20 players fit on a page.
-const ROSTER_LINE = cellLine() / 20; // 14.4 pt
-const ROSTER_PAD = (pt(ROSTER_ROW_H) - ROSTER_LINE) / 2;
+const ROSTER_PAD = (pt(ROSTER_ROW_H) - LINE - CELL_LINE) / 2;
 const ROSTER_LAYOUT = { ...LAYOUT, paddingTop: () => ROSTER_PAD, paddingBottom: () => ROSTER_PAD };
 const NAME_LINE = 14 * NATURAL_LINE;
 
@@ -66,7 +75,7 @@ function rosterTable(t: { stc: number | null; name: string; players: RosterRow[]
     stack: [
       { id, text: `${t.stc ?? ''}  ${t.name}`, bold: true, fontSize: 14, margin: [0, pt(ROSTER_TITLE_H) - NAME_LINE, 0, 0] },
       {
-        lineHeight: ROSTER_LINE / (FS * NATURAL_LINE),
+        lineHeight: CELL_LH,
         table: {
           widths: widths(ROSTER_COLS), dontBreakRows: true,
           body: [
@@ -98,7 +107,8 @@ function roundTable(r: RoundView, withRef: boolean, id: string) {
       return row;
     }),
   ];
-  return { table: { widths: widths(cw), body, dontBreakRows: true }, layout: LAYOUT, unbreakable: true, margin: [0, 0, 0, 12] };
+  // rounds separated by one empty paragraph (DOCX gap)
+  return { table: { widths: widths(cw), body, dontBreakRows: true }, layout: TABLE, lineHeight: CELL_LH, unbreakable: true, margin: [0, 0, 0, FS * NATURAL_LINE] };
 }
 
 function calendarMonth(mo: CalMonth, weeks: number, id?: string) {
@@ -133,17 +143,22 @@ function section(s: Section, id: string): any[] {
     case 'rich': return rich(s.blocks, id);
     case 'lines': return s.lines.map((l, i) => ({ id: `${id}${i}`, text: l, margin: [0, 0, 0, 3] }));
     case 'venues': return [{
-      table: { widths: widths(VENUE_COLS), dontBreakRows: true, body: s.rows.map((r, i) => [{ id: `${id}${i}`, text: String(r.stc ?? ''), alignment: 'center' }, { text: r.name, bold: true }, { text: r.venue }]) },
-      layout: LAYOUT,
+      table: {
+        widths: widths(VENUE_COLS), dontBreakRows: true, ...fixedRows(VENUE_ROW_H),
+        body: s.rows.map((r, i) => [{ id: `${id}${i}`, text: String(r.stc ?? ''), alignment: 'center' }, { text: r.name }, { text: r.venue }]
+          .map((c) => ({ ...c, verticalAlignment: 'middle' }))),
+      },
+      layout: TABLE, lineHeight: CELL_LH,
     }];
     case 'contacts': return [{
       table: {
-        widths: widths(CONTACT_COLS), dontBreakRows: true,
+        widths: widths(CONTACT_COLS), dontBreakRows: true, ...fixedRows(CONTACT_ROW_H),
         body: contactRows(s.teams).map((r, i) => (r.team != null
           ? [{ id: `${id}${i}`, text: r.team, bold: true, fillColor: SUB, colSpan: 4 }, {}, {}, {}]
-          : [{ id: `${id}${i}`, text: r.label }, r.name, r.phone, r.email ? { text: r.email, link: `mailto:${r.email}`, color: '#0563C1' } : ''])),
+          : [{ id: `${id}${i}`, text: r.label }, { text: r.name }, { text: r.phone }, r.email ? { text: r.email, link: `mailto:${r.email}`, color: '#0563C1' } : { text: '' }])
+          .map((c: any) => (c.text != null ? { ...c, verticalAlignment: 'middle' } : c))),
       },
-      layout: LAYOUT,
+      layout: TABLE, lineHeight: CELL_LH,
     }];
     case 'rosters': return pairs(s.teams).map((p, k) => ({
       columns: p.map((t, j) => rosterTable(t, j ? undefined : `${id}${k}`)), columnGap: pt(ROSTER_GAP), unbreakable: true,

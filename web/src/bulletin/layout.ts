@@ -39,6 +39,10 @@ export function schedCols(withRef: boolean): number[] {
   return cols;
 }
 
+/** Rows as in the approved bulletin (rpb_26_27_uz): venues at least two lines high, address book 21 pt (DXA). */
+export const VENUE_ROW_H = 792;
+export const CONTACT_ROW_H = 420;
+
 /** Venues: start number | team | venue. */
 export const VENUE_COLS = [460, 3700, CONTENT - 460 - 3700];
 /** Address book: role | name | phone | e-mail (team name row spans all). */

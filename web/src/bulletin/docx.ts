@@ -6,7 +6,7 @@ import type { RichBlock } from '../../../shared/bulletin/rich';
 import {
   C_BORDER, C_CAL, C_SUB, C_TIME, C_WKND, CAL_COL, CAL_GAP, CELL_PAD, CONTACT_COLS, FONT, FS, FS_NAME, GAP_PARA_H, HDR_DIST,
   MARGIN_X, MARGIN_Y, PAGE_H, PAGE_W, ROSTER_COLS, ROSTER_GAP, ROSTER_HDRS, ROSTER_PAIR_GAP, ROSTER_ROW_H, ROSTER_TITLE_H,
-  SCHED_HDRS, VENUE_COLS, cellLine, pairs, schedCols, sum,
+  SCHED_HDRS, VENUE_COLS, VENUE_ROW_H, CONTACT_ROW_H, cellLine, pairs, schedCols, sum,
 } from './layout';
 
 type Docx = typeof import('docx');
@@ -80,15 +80,15 @@ function buildDocument(D: Docx, model: BulletinModel) {
   // ── Venues ──
   const venues = (rows: { stc: number | null; name: string; venue: string }[]) => {
     const c = VENUE_COLS;
-    return table(c, rows.map((r) => row([
+    return table(c, rows.map((r) => new D.TableRow({ cantSplit: true, height: { value: VENUE_ROW_H, rule: D.HeightRule.ATLEAST }, children: [
       cell(r.stc ?? '', { w: c[0], align: 'center' }),
-      cell(r.name, { w: c[1], bold: true }),
+      cell(r.name, { w: c[1] }),
       new D.TableCell({
         width: { size: c[2], type: D.WidthType.DXA }, borders: B_ALL, verticalAlign: D.VerticalAlign.CENTER,
         margins: { top: 20, bottom: 20, left: CELL_PAD, right: CELL_PAD },
         children: [new D.Paragraph({ spacing: { before: 0, after: 0 }, children: [run(r.venue)] })],
       }),
-    ])));
+    ] })));
   };
 
   // ── Address book: one table, team name row + contact rows; a team does not split across pages ──
@@ -97,14 +97,14 @@ function buildDocument(D: Docx, model: BulletinModel) {
     const rows: InstanceType<Docx['TableRow']>[] = [];
     for (const t of teams) {
       const n = t.rows.length;
-      rows.push(row([cell(t.name, { w: sum(c), span: 4, bold: true, bg: C_SUB, keepNext: n > 0 })]));
+      rows.push(row([cell(t.name, { w: sum(c), span: 4, bold: true, bg: C_SUB, keepNext: n > 0 })], CONTACT_ROW_H));
       t.rows.forEach((r, i) => {
         const kn = i < n - 1;
         rows.push(row([
           cell(r.label, { w: c[0], keepNext: kn }), cell(r.name, { w: c[1], keepNext: kn }),
           cell(r.phone, { w: c[2], keepNext: kn }),
           cell(r.email ? [link(r.email, `mailto:${r.email}`)] : '', { w: c[3], keepNext: kn }),
-        ]));
+        ], CONTACT_ROW_H));
       });
     }
     return table(c, rows);

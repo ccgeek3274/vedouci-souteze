@@ -72,6 +72,9 @@ describe('model', () => {
     const m = buildModel(data(), defaultConfig());
     const titles = m.chapters.map((c) => c.title);
     expect(titles).toContain('Nedostatky soupisek');
+    // the address book and the rosters on a new page, the deficiencies after the schedule
+    expect(titles.indexOf('Nedostatky soupisek')).toBe(titles.indexOf('Rozlosování soutěže') + 1);
+    expect(m.chapters.filter((c) => c.pageBreak).map((c) => c.title)).toEqual(['Adresář kapitánů, zástupců a organizačních pracovníků', 'Soupisky družstev', 'Kalendář soutěže']);
     const def = m.chapters.find((c) => c.title === 'Nedostatky soupisek')!.sections[0] as any;
     expect(def.type).toBe('rich'); // editable, generated from the roster check
     expect(def.blocks.map((b: any) => [b.list, b.runs.map((r: any) => (r.b ? `*${r.text}` : r.text)).join('')]))

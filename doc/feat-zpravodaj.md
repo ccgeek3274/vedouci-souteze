@@ -49,6 +49,17 @@ po 20 hráčích — v DOCX přesnou výškou řádku, v PDF řádkem písma 14,
 v náhledu stejně v px. Nadpis kapitoly bez zlomu tvoří v PDF s prvním blokem (kolo, dvojice soupisek, odstavec)
 nedělitelný blok — pravidlo „nadpis nezůstane dole“ v `pageBreakBefore` samo nestačilo (Rozlosování zůstalo dole).
 
+**Schválený formát** `doc/rpb_26_27_uz.pdf` (DOCX z uvodni-zpravodaj v LibreOffice, Carlito 12 pt), sjednoceno 30. 10. 2026:
+- buňky tabulek bez svislého paddingu, řádek textu přesně 14,4 pt (`cellLine`) → řádek rozlosování 14,9 pt, mezi koly
+  prázdný odstavec 12 pt → **6 kol po 5 zápasech na stránku**; v PDF `lineHeight` 14,4 / 14,65 a nulový padding;
+- hrací místnosti: řádek aspoň `VENUE_ROW_H` 792 DXA (≈ 2 řádky), text svisle uprostřed, název družstva netučně;
+- adresář: řádky `CONTACT_ROW_H` 420 DXA (21 pt), text uprostřed (pdfmake `verticalAlignment: 'middle'`);
+- soupisky: rozteč `ROSTER_ROW_H` 314 DXA včetně čáry.
+- Kapitola **Nedostatky soupisek** (jen předběžný) je **za Rozlosováním** (ve schváleném definitivním chybí).
+- Kalendář si nechává vlastní buňky (čtverce) s paddingem.
+Výsledek na demo RPB: PDF i DOCX (LibreOffice) 8 stran jako schválený — 1 titul + místnosti, 2 adresář, 3–4 soupisky,
+5 soupisky 9–10 + kola 1–3, 6 kola 4–9, pak nedostatky, požadavky… a kalendář.
+
 ## Edge cases
 - Startovní čísla API nevrací: pořadí podle `teamId` ověřené 1. kolem Bergera, pak pořadí tabulky, pak losovací
   čísla aplikace; nesoulad s losovacími čísly aplikace = varování.
