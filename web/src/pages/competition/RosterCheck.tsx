@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '../../lib/api';
-import { czDateTime } from '../../lib/format';
+import { czDateTime, ROLE_LABEL } from '../../lib/format';
 import { checkTeamRoster, checkedAt, chessczGet, competitionIssues, prepareCheck, runVCheck } from '../../lib/rosterCheck';
-import type { RosterCheckData, RosterPlayer } from '../../lib/types';
+import type { Contact, RosterCheckData, RosterPlayer } from '../../lib/types';
+import { contactNameFindings, type ContactNameFinding } from '../../../../shared/roster/contactNames';
 import { asArray, deficiencyReport, strikeReason, toggleAccepted, type Issue } from '../../../../shared/roster/verify';
 import { sameCompetition, type RosterCheckSection } from '../../../../shared/registry';
 import { fold } from '../../../../shared/text';
@@ -32,6 +33,13 @@ export function RosterCheck() {
   if (isLoading || !data) return <p style={{ color: 'var(--cream)' }}>Načítání…</p>;
   const issues = competitionIssues(data, c);
   const withRoster = data.teams.filter((t) => t.players?.length);
+  // contact names against the rosters (light, no chess.cz)
+  const rosterNames = (t: Team) => (t.players ?? []).filter((p) => !p.struck).map((p) => p.name);
+  const contactsOf = (t: Team) => comp.teams.find((x) => x.id === t.id)?.contacts ?? [];
+  const nameFindings = new Map(data.teams.map((t) => [
+    t.id, contactNameFindings(contactsOf(t), rosterNames(t), data.teams.filter((o) => o.id !== t.id).flatMap(rosterNames)),
+  ]));
+  const nameCount = [...nameFindings.values()].reduce((n, f) => n + f.length, 0);
 
   const run = async (list: Team[]) => {
     setError(null);
@@ -79,6 +87,7 @@ export function RosterCheck() {
             {' · '}{bad ? <span className="tag bad">{bad} s nedostatky</span> : <span className="tag ok">bez nedostatků</span>}
             {toStrike > 0 && <> · <span className="tag bad">{toStrike} navrženo k vyškrtnutí</span></>}
             {accepted > 0 && <> · <span className="tag">{accepted} s odsouhlaseným nedostatkem</span></>}
+            {nameCount > 0 && <> · <span className="tag warn">{nameCount} {nameCount === 1 ? 'jméno' : nameCount < 5 ? 'jména' : 'jmen'} v kontaktech k ověření</span></>}
           </p>
           <p className="helper-text">
             Před definitivním úvodním zpravodajem se vyškrtnou hráči bez registrace a hosté bez povolení hostování (rozpis).
@@ -86,6 +95,8 @@ export function RosterCheck() {
             hostování a cizinci podle registrů ŠSČR (hostovani / registracecizincu.appchess.cz). Označení V má samostatnou kontrolu níže.
             Každý nález lze <b>odsouhlasit</b> (✓) — pak se nepočítá jako nedostatek, nenavrhuje vyškrtnutí a nejde do zpravodaje.
             Kontrola volá chess.cz postupně (~3 dotazy/s), u celé skupiny trvá asi minutu.
+            Jména v kontaktech (kapitán, zástupce, komunikace, rozhodčí) se hned porovnají se soupiskami bez chess.cz — upozorní
+            na přehozené jméno a příjmení (soupisky i zpravodaj mají Příjmení Jméno).
           </p>
           <div className="row">
             <button className="btn btn-primary" disabled={!!progress || !withRoster.length} onClick={() => run(withRoster)}>Ověřit všechny soupisky na chess.cz</button>
@@ -102,7 +113,10 @@ export function RosterCheck() {
       <VCheckCard competition={c} data={data} busy={!!progress} onDone={refresh} />
       <ChessczRosterCheck competition={c} teams={data.teams.map((t) => t.name)} />
 
-      {data.teams.map((t) => <TeamCheck key={t.id} team={t} issues={issues} busy={!!progress} onCheck={() => run([t])} onChanged={refresh} />)}
+      {data.teams.map((t) => (
+        <TeamCheck key={t.id} team={t} issues={issues} busy={!!progress} onCheck={() => run([t])} onChanged={refresh}
+          contacts={contactsOf(t)} nameFindings={nameFindings.get(t.id) ?? []} onContactsChanged={refreshCompetition} />
+      ))}
 
       <div className="card">
         <div className="card-strip"><h2>Nedostatky pro předběžný zpravodaj</h2>
@@ -117,8 +131,9 @@ export function RosterCheck() {
   );
 }
 
-function TeamCheck({ team, issues, busy, onCheck, onChanged }: {
+function TeamCheck({ team, issues, busy, onCheck, onChanged, contacts, nameFindings, onContactsChanged }: {
   team: Team; issues: Map<number, Issue[]>; busy: boolean; onCheck: () => void; onChanged: () => Promise<unknown>;
+  contacts: Contact[]; nameFindings: ContactNameFinding[]; onContactsChanged: () => Promise<unknown>;
 }) {
   const players = team.players ?? [];
   const at = checkedAt(players);
@@ -144,7 +159,38 @@ function TeamCheck({ team, issues, busy, onCheck, onChanged }: {
               </tbody>
             </table>
           )}
+        <ContactNames teamId={team.id} contacts={contacts} findings={nameFindings} onChanged={onContactsChanged} />
       </div>
+    </div>
+  );
+}
+
+/** Contact names that do not look like "Příjmení Jméno" of the rosters; "opravit" rewrites the contact. */
+function ContactNames({ teamId, contacts, findings, onChanged }: {
+  teamId: string; contacts: Contact[]; findings: ContactNameFinding[]; onChanged: () => Promise<unknown>;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  if (!findings.length) return null;
+  const fix = async (f: ContactNameFinding) => {
+    setError(null);
+    try {
+      // the same person in more roles (captain and referee) — all at once
+      const wrong = contacts[f.index].name.trim();
+      await api.put(`/teams/${teamId}/contacts`, { contacts: contacts.map((ct) => (ct.name.trim() === wrong ? { ...ct, name: f.suggestion } : ct)) });
+      await onChanged();
+    } catch (e) {
+      setError(apiErrorText(e));
+    }
+  };
+  return (
+    <div className="issues" style={{ marginTop: 10 }}>
+      {findings.map((f) => (
+        <div key={f.index} className="warn">
+          ! {ROLE_LABEL[contacts[f.index].role]}: {f.text}
+          {f.suggestion && <button className="issue-acc" title="Přepsat jméno v kontaktech družstva" onClick={() => fix(f)}>opravit na {f.suggestion}</button>}
+        </div>
+      ))}
+      {error && <div className="bad">{error}</div>}
     </div>
   );
 }

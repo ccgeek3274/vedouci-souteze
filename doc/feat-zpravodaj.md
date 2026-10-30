@@ -26,6 +26,15 @@ zpravodaje RPB 2026/27 (`doc/rpb_26_27_uz_v3.docx`) a o PDF (pdfmake + Carlito j
 - **Nedostatky soupisek jsou upravitelná kapitola** (text `deficiencies`, jako ostatní editovatelné kapitoly):
   výchozí text se generuje z kontroly soupisek (družstvo tučně, nálezy jako odrážky, `deficiencyDelta`) a sleduje ji,
   dokud ho vedoucí neupraví. Odsouhlasené nálezy (✓ na Kontrole soupisek) se do něj negenerují.
+- **Náhled stránkovaný jako PDF** (30. 10. 2026, stejný mechanismus jako zpravodaj z kola, `web/src/bulletin/paginate.ts`):
+  náhled má geometrii PDF 1:1 (1 px = 15 DXA, okraje, písmo 12 pt, řádek 1,22, buňky 1,5 / 2,5 pt) a dělí se na strany A4
+  podle skutečného rozložení PDF (`pdfPageMap`, 300 ms po změně na pozadí). Id uzlů PDF = `data-pg` v náhledu:
+  `t*` titul, `h*` kapitoly, oddíly `i.` (úvod) / `s{kapitola}.{oddíl}.` + pořadí položky (odstavec, řádek tabulky
+  místností / adresáře, dvojice soupisek, kolo, dvojice měsíců…). Náhled je flex sloupec, aby se okraje sčítaly jako
+  v pdfmake (bez slučování marginů). Místnosti a adresář se v PDF lámou po řádcích → v náhledu je každý řádek vlastní
+  tabulka. Kapitola Kalendář má pevný zlom (pdfmake ho v `pageBreakBefore` nehlásí → `data-pg-break`); nadpis
+  posunutý pravidlem „nadpis nezůstane dole“ se zapíše na další stranu (pdfmake se na uzel ptá jen jednou).
+  Jen v náhledu jsou lišty editorů a řádek „chybí kontakty“ (`data-pg-ghost`, stránka je o ně delší).
 
 ## Kapitoly
 Titul (název a region z chess.cz, „(Předběžný) úvodní zpravodaj – ročník“, datum vydání), úvod, 1. Hrací místnost,

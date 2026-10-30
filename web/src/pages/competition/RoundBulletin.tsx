@@ -202,7 +202,7 @@ export function RoundBulletin({ nr }: { nr: number }) {
     return () => { alive = false; window.clearTimeout(t); };
   }, [model, lay, sl]);
   useLayoutEffect(() => {
-    if (docRef.current && layerRef.current && cssRef.current) paginate(docRef.current, layerRef.current, cssRef.current, pageMap);
+    if (docRef.current && layerRef.current && cssRef.current) paginate(docRef.current, layerRef.current, cssRef.current, pageMap, MARGIN_B);
   });
 
 
@@ -326,9 +326,9 @@ export function RoundBulletin({ nr }: { nr: number }) {
       ) : (
         <div className="doc-wrap">
           <style ref={cssRef} />
-          <div className="rdoc" ref={docRef} style={{ padding: `${px(HDR_DIST)} ${px(MARGIN_X)} ${px(MARGIN_B)}`, fontSize: ptPx(cfg.fontPt) }}>
-            <div className="rdoc-top" style={{ height: px(MARGIN_T - HDR_DIST) }}>
-              <div className="rdoc-hdr" style={{ fontSize: ptPx(model.hdr.size), color: css(model.hdr.color), ...ruleCss(model.hdr.rule) }}>
+          <div className="rdoc pgdoc" ref={docRef} style={{ padding: `${px(HDR_DIST)} ${px(MARGIN_X)} ${px(MARGIN_B)}`, fontSize: ptPx(cfg.fontPt) }}>
+            <div className="rdoc-top" data-pg-skip="" style={{ height: px(MARGIN_T - HDR_DIST) }}>
+              <div className="rdoc-hdr" data-pg-hdr="" style={{ fontSize: ptPx(model.hdr.size), color: css(model.hdr.color), ...ruleCss(model.hdr.rule) }}>
                 {model.hdr.c != null ? <span className="c">{model.hdr.c}</span> : <><span>{model.hdr.l ?? ''}</span><span>{model.hdr.r ?? ''}</span></>}
               </div>
             </div>
@@ -368,7 +368,7 @@ export function RoundBulletin({ nr }: { nr: number }) {
                   </table>
                 )}
                 {ci === 2 && (
-                  <div className="d-rich">
+                  <div className="d-rich" data-pg="r">
                     <div className="d-rich-bar">
                       <span>Různé · {model.rozne.custom ? 'upraveno' : 'výchozí text (sleduje vedoucího a datum vydání)'}</span>
                       {model.rozne.custom && (

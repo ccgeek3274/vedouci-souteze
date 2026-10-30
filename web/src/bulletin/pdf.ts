@@ -3,9 +3,10 @@
 import type { BulletinModel, CalMonth, RoundView, RosterRow, Section } from '../../../shared/bulletin/initial';
 import { CONFLICT, CZ_DAYS } from '../../../shared/bulletin/initial';
 import type { RichBlock } from '../../../shared/bulletin/rich';
+import { richId } from './paginate';
 import {
   C_BORDER, C_CAL, C_SUB, C_TIME, C_WKND, CAL_COL, CAL_GAP, CONTACT_COLS, MARGIN_X, MARGIN_Y, HDR_DIST,
-  ROSTER_COLS, ROSTER_GAP, ROSTER_HDRS, ROSTER_PAIR_GAP, ROSTER_W, SCHED_HDRS, VENUE_COLS, pairs, schedCols,
+  ROSTER_COLS, ROSTER_GAP, ROSTER_HDRS, ROSTER_PAIR_GAP, ROSTER_W, SCHED_HDRS, VENUE_COLS, contactRows, INTRO_ID, pairs, schedCols, sectionId,
 } from './layout';
 
 const pt = (dxa: number) => dxa / 20;
@@ -21,11 +22,13 @@ const LAYOUT = {
 const NO_LINES = { ...LAYOUT, hLineWidth: () => 0, vLineWidth: () => 0 };
 const SUB = `#${C_SUB}`;
 
-function rich(blocks: RichBlock[]): any[] {
+// Node ids (data-pg in the preview, for its page breaks): t* titles, h* chapters, sections `i.` (intro) / `s{ch}.{n}.`
+// + order of the item (paragraph, line, table row, roster / calendar pair, round, link).
+function rich(blocks: RichBlock[], id: string): any[] {
   const out: any[] = [];
   let list: any = null;
   let kind: string | null = null;
-  for (const bl of blocks) {
+  blocks.forEach((bl, bi) => {
     const runs = bl.runs.map((r) => {
       const o: any = { text: r.text };
       if (r.b) o.bold = true;
@@ -34,7 +37,7 @@ function rich(blocks: RichBlock[]): any[] {
       if (r.link) { o.link = r.link; o.color = '#0563C1'; }
       return o;
     });
-    const node = { text: runs.length ? runs : ' ', margin: [0, 0, 0, bl.list ? 3 : 6] };
+    const node = { id: richId(id, bi), text: runs.length ? runs : ' ', margin: [0, 0, 0, bl.list ? 3 : 6] };
     if (bl.list) {
       const key = bl.list === 'ordered' ? 'ol' : 'ul';
       if (!list || kind !== key) { list = { [key]: [], margin: [0, 0, 0, 3] }; kind = key; out.push(list); }
@@ -43,16 +46,16 @@ function rich(blocks: RichBlock[]): any[] {
       list = null;
       out.push(node);
     }
-  }
+  });
   return out;
 }
 
-function rosterTable(t: { stc: number | null; name: string; players: RosterRow[] }) {
+function rosterTable(t: { stc: number | null; name: string; players: RosterRow[] }, id?: string) {
   const al = ['center', 'left', 'center', 'center', 'center', 'center', 'center'];
   return {
     width: pt(ROSTER_W),
     stack: [
-      { text: `${t.stc ?? ''}  ${t.name}`, bold: true, fontSize: 14, margin: [0, 0, 0, 2] },
+      { id, text: `${t.stc ?? ''}  ${t.name}`, bold: true, fontSize: 14, margin: [0, 0, 0, 2] },
       {
         table: {
           widths: widths(ROSTER_COLS), dontBreakRows: true,
@@ -67,12 +70,12 @@ function rosterTable(t: { stc: number | null; name: string; players: RosterRow[]
   };
 }
 
-function roundTable(r: RoundView, withRef: boolean) {
+function roundTable(r: RoundView, withRef: boolean, id: string) {
   const cw = schedCols(withRef);
   const nc = cw.length;
   const al = ['center', 'center', 'left', 'center', 'left', 'center', 'left'];
   const body: any[] = [
-    [{ text: r.header, bold: true, colSpan: nc, border: [false, false, false, true] }, ...Array(nc - 1).fill({})],
+    [{ id, text: r.header, bold: true, colSpan: nc, border: [false, false, false, true] }, ...Array(nc - 1).fill({})],
     SCHED_HDRS.slice(0, nc).map((x, i) => ({ text: x, bold: true, fillColor: SUB, alignment: al[i] })),
     ...r.rows.map((m) => {
       const home: any[] = [m.homeName];
@@ -88,14 +91,14 @@ function roundTable(r: RoundView, withRef: boolean) {
   return { table: { widths: widths(cw), body, dontBreakRows: true }, layout: LAYOUT, unbreakable: true, margin: [0, 0, 0, 12] };
 }
 
-function calendarMonth(mo: CalMonth, weeks: number) {
+function calendarMonth(mo: CalMonth, weeks: number, id?: string) {
   const wks = [...mo.weeks];
   while (wks.length < weeks) wks.push(Array(7).fill(null));
   const sq = pt(CAL_COL) - 2 * 1.5 - LINE;
   return {
     width: pt(7 * CAL_COL),
     stack: [
-      { text: mo.name, bold: true, fontSize: 14, margin: [0, 0, 0, 2] },
+      { id, text: mo.name, bold: true, fontSize: 14, margin: [0, 0, 0, 2] },
       {
         table: {
           widths: widths(Array(7).fill(CAL_COL)),
@@ -115,37 +118,37 @@ function calendarMonth(mo: CalMonth, weeks: number) {
   };
 }
 
-function section(s: Section): any[] {
+function section(s: Section, id: string): any[] {
   switch (s.type) {
-    case 'rich': return rich(s.blocks);
-    case 'lines': return s.lines.map((l) => ({ text: l, margin: [0, 0, 0, 3] }));
+    case 'rich': return rich(s.blocks, id);
+    case 'lines': return s.lines.map((l, i) => ({ id: `${id}${i}`, text: l, margin: [0, 0, 0, 3] }));
     case 'venues': return [{
-      table: { widths: widths(VENUE_COLS), dontBreakRows: true, body: s.rows.map((r) => [{ text: String(r.stc ?? ''), alignment: 'center' }, { text: r.name, bold: true }, { text: r.venue }]) },
+      table: { widths: widths(VENUE_COLS), dontBreakRows: true, body: s.rows.map((r, i) => [{ id: `${id}${i}`, text: String(r.stc ?? ''), alignment: 'center' }, { text: r.name, bold: true }, { text: r.venue }]) },
       layout: LAYOUT,
     }];
     case 'contacts': return [{
       table: {
         widths: widths(CONTACT_COLS), dontBreakRows: true,
-        body: s.teams.flatMap((t) => [
-          [{ text: t.name, bold: true, fillColor: SUB, colSpan: 4 }, {}, {}, {}],
-          ...t.rows.map((r) => [r.label, r.name, r.phone, r.email ? { text: r.email, link: `mailto:${r.email}`, color: '#0563C1' } : '']),
-        ]),
+        body: contactRows(s.teams).map((r, i) => (r.team != null
+          ? [{ id: `${id}${i}`, text: r.team, bold: true, fillColor: SUB, colSpan: 4 }, {}, {}, {}]
+          : [{ id: `${id}${i}`, text: r.label }, r.name, r.phone, r.email ? { text: r.email, link: `mailto:${r.email}`, color: '#0563C1' } : ''])),
       },
       layout: LAYOUT,
     }];
-    case 'rosters': return pairs(s.teams).map((p) => ({
-      columns: p.map(rosterTable), columnGap: pt(ROSTER_GAP), unbreakable: true, margin: [0, 0, 0, pt(ROSTER_PAIR_GAP)],
+    case 'rosters': return pairs(s.teams).map((p, k) => ({
+      columns: p.map((t, j) => rosterTable(t, j ? undefined : `${id}${k}`)), columnGap: pt(ROSTER_GAP), unbreakable: true, margin: [0, 0, 0, pt(ROSTER_PAIR_GAP)],
     }));
-    case 'rounds': return s.rounds.map((r) => roundTable(r, s.withRef));
-    case 'links': return s.links.map((l) => ({ text: [`${l.label}: `, { text: l.url, link: l.url, color: '#0563C1', decoration: 'underline' }], margin: [0, 0, 0, 6] }));
+    case 'rounds': return s.rounds.map((r, k) => roundTable(r, s.withRef, `${id}${k}`));
+    case 'links': return s.links.map((l, k) => ({ id: `${id}${k}`, text: [`${l.label}: `, { text: l.url, link: l.url, color: '#0563C1', decoration: 'underline' }], margin: [0, 0, 0, 6] }));
     case 'signature': return s.name ? [{
+      id: `${id}0`,
       margin: [0, 12, 0, 0],
       text: [s.name, ...(s.email ? ['\n', { text: s.email, link: `mailto:${s.email}`, color: '#0563C1', decoration: 'underline' }] : []), ...(s.phone ? [`\ntel: ${s.phone}`] : [])],
     }] : [];
-    case 'calendar': return pairs(s.months).map((p) => {
+    case 'calendar': return pairs(s.months).map((p, k) => {
       const weeks = Math.max(...p.map((m) => m.weeks.length));
       return {
-        columns: [{ width: '*', text: '' }, ...p.map((m) => calendarMonth(m, weeks)), ...(p.length < 2 ? [{ width: pt(7 * CAL_COL), text: '' }] : []), { width: '*', text: '' }],
+        columns: [{ width: '*', text: '' }, ...p.map((m, j) => calendarMonth(m, weeks, j ? undefined : `${id}${k}`)), ...(p.length < 2 ? [{ width: pt(7 * CAL_COL), text: '' }] : []), { width: '*', text: '' }],
         columnGap: pt(CAL_GAP) / 2, unbreakable: true, margin: [0, 0, 0, 12],
       };
     });
@@ -154,14 +157,14 @@ function section(s: Section): any[] {
 
 export function buildPdfDef(model: BulletinModel): any {
   const content: any[] = [
-    { text: model.title, bold: true, fontSize: 20, alignment: 'center', margin: [0, 0, 0, 6] },
-    ...model.subtitles.map((s) => ({ text: s, fontSize: 14, alignment: 'center', margin: [0, 3, 0, 3] })),
+    { id: 't0', text: model.title, bold: true, fontSize: 20, alignment: 'center', margin: [0, 0, 0, 6] },
+    ...model.subtitles.map((s, i) => ({ id: `t${i + 1}`, text: s, fontSize: 14, alignment: 'center', margin: [0, 3, 0, 3] })),
     { text: '', margin: [0, 0, 0, 12] },
-    ...section(model.intro),
+    ...section(model.intro, INTRO_ID),
   ];
   model.chapters.forEach((c, i) => {
-    content.push({ text: `${i + 1}.  ${c.title}`, bold: true, fontSize: 14, margin: [0, c.pageBreak ? 0 : 12, 0, 6], pageBreak: c.pageBreak ? 'before' : undefined, headlineLevel: 1 });
-    content.push(...c.sections.flatMap(section));
+    content.push({ id: `h${i}`, text: `${i + 1}.  ${c.title}`, bold: true, fontSize: 14, margin: [0, c.pageBreak ? 0 : 12, 0, 6], pageBreak: c.pageBreak ? 'before' : undefined, headlineLevel: 1 });
+    content.push(...c.sections.flatMap((s, j) => section(s, sectionId(i, j))));
   });
   return {
     pageSize: 'A4',
@@ -193,4 +196,21 @@ export async function buildPdfBlob(model: BulletinModel): Promise<Blob> {
   const pdfMake = await loadPdfMake();
   // pdfmake rewrites the definition in place — never hand it arrays shared with the (rendered) model
   return pdfMake.createPdf(buildPdfDef(structuredClone(model))).getBlob();
+}
+
+/** Page of every block of the PDF (ids as data-pg in the preview), for the page breaks of the preview. */
+export async function pdfPageMap(model: BulletinModel): Promise<Record<string, number>> {
+  const pdfMake = await loadPdfMake();
+  const map: Record<string, number> = {};
+  const def = buildPdfDef(structuredClone(model));
+  const keepHeadings = def.pageBreakBefore;
+  // the heading rule moves a heading to the next page and lays the document out again; pdfmake asks about every node
+  // only once (nodes after it are asked in the new layout), so the moved heading is recorded on the next page here
+  def.pageBreakBefore = (n: any, ...rest: any[]) => {
+    const moved = keepHeadings(n, ...rest);
+    if (n.id) map[n.id] = n.startPosition.pageNumber + (moved ? 1 : 0);
+    return moved;
+  };
+  await pdfMake.createPdf(def).getBuffer();
+  return map;
 }

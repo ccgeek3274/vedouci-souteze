@@ -75,6 +75,18 @@ vyškrtnutím (párování LOK, bez LOK jméno). Změna LOK/FIDE snapshot zahod�
 - „Nedostatky pro předběžný zpravodaj“ = text po družstvech (`deficiencyReport`): nedostatky + vše, co vede
   k návrhu na vyškrtnutí — v M8 se vloží do zpravodaje.
 
+## Jména v kontaktech (30. 10. 2026)
+Lehká kontrola bez chess.cz (`shared/roster/contactNames.ts`, karta družstva na Kontrole soupisek): jména kapitána,
+zástupce, komunikace a rozhodčích se porovnají se soupiskami (nevyškrtnutí hráči). Soupisky, chess.cz i zpravodaje
+píšou „Příjmení Jméno“; kontakt v jiném pořadí by šel do adresáře a k rozhodčím ve zpravodaji obráceně.
+- Hráč se stejnými slovy v jiném pořadí (vlastní soupiska, pak ostatní v soutěži) → „přehozené jméno a příjmení?“,
+  návrh = jméno ze soupisky.
+- Lidé mimo soupisky (typicky rozhodčí): první slovo je na soupiskách křestní jméno (poslední slovo) a nikde
+  příjmení, poslední slovo nikde křestní → „vypadá jako Jméno Příjmení“, návrh = první slovo na konec (jen bez titulů).
+- Tituly a ml./st. se ignorují, diakritika a velikost písmen také. Jen upozornění (!), nejde do zpravodaje,
+  nejde odsouhlasit; *opravit na …* přepíše kontakt (všechny kontakty družstva s tím jménem — kapitán bývá i rozhodčí).
+  Nominace rozhodčích mají jména uložená zvlášť — po opravě kontaktu je případně opravit tam.
+
 ## Ruční úprava soupisky
 Detail družstva → „Upravit soupisku“: jméno, rok, LOK, FIDE, Z, H/V/C, K/ZK, pořadí, přidání / odebrání
 hráče, „Nastavit Z podle pravidla“ (přeskočeným písmenkovým ponechá volbu kapitána). Uložení = nová verze soupisky

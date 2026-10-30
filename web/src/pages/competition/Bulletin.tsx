@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api, apiErrorText } from '../../lib/api';
@@ -7,11 +7,15 @@ import { useCompetition } from './CompetitionLayout';
 import { RichEditor } from '../../components/RichEditor';
 import { assemble, loadChesscz } from '../../bulletin/load';
 import { buildDocxBlob } from '../../bulletin/docx';
-import { buildPdfBlob } from '../../bulletin/pdf';
+import { buildPdfBlob, pdfPageMap } from '../../bulletin/pdf';
+import { paginate, type PageMap } from '../../bulletin/paginate';
 import {
   buildModel, CONFLICT, CZ_DAYS, normalizeConfig, type InitialConfig, type Section, type TextKey,
 } from '../../../../shared/bulletin/initial';
-import { pairs } from '../../bulletin/layout';
+import {
+  CAL_COL, CAL_GAP, CONTACT_COLS, HDR_DIST, INTRO_ID, MARGIN_X, MARGIN_Y, ROSTER_COLS, ROSTER_GAP, ROSTER_PAIR_GAP, ROSTER_W,
+  VENUE_COLS, pairs, schedCols, sectionId,
+} from '../../bulletin/layout';
 import { downloadBlob, SAVE_TEXT, saveTagClass, SavepointsCard, useBulletinDraft } from '../../bulletin/draft';
 
 // Úvodní zpravodaj (M8): rosters and the schedule from chess.cz, venues / contacts / start-time exceptions from
@@ -40,6 +44,25 @@ export function InitialBulletin() {
     [cfg, cz.data, detail, check.data, refsQ.data],
   );
   const model = useMemo(() => (assembled && cfg ? buildModel(assembled.data, cfg) : null), [assembled, cfg]);
+
+  // Page breaks of the preview: estimate at once, then the real ones from the PDF laid out in the background.
+  const docRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
+  const cssRef = useRef<HTMLStyleElement>(null);
+  const [pageMap, setPageMap] = useState<PageMap | null>(null);
+  const structure = model ? JSON.stringify(model.chapters.map((ch) => [ch.title, ch.sections.map((x) => x.type)])) : '';
+  useEffect(() => setPageMap(null), [structure]); // other blocks → the old map does not apply
+  useEffect(() => {
+    if (!model) return;
+    let alive = true;
+    const t = window.setTimeout(() => {
+      pdfPageMap(model).then((m) => alive && setPageMap(m)).catch(() => { /* the estimate stays */ });
+    }, 300);
+    return () => { alive = false; window.clearTimeout(t); };
+  }, [model]);
+  useLayoutEffect(() => {
+    if (docRef.current && layerRef.current && cssRef.current) paginate(docRef.current, layerRef.current, cssRef.current, pageMap, MARGIN_Y);
+  });
 
   if (stored.isLoading || !cfg) return <div className="muted">Načítám…</div>;
   if (stored.error) return <div className="alert">{apiErrorText(stored.error)}</div>;
@@ -148,19 +171,22 @@ export function InitialBulletin() {
         <div className="card"><div className="card-body muted">{cz.isLoading ? `Načítám data z chess.cz (${progress})…` : 'Načítám…'}</div></div>
       ) : (
         <div className="doc-wrap">
-          <div className="doc">
-            <div className="doc-hdr">{model.header}</div>
-            <div className="d-title">{model.title}</div>
-            {model.subtitles.map((s) => <div key={s} className="d-sub">{s}</div>)}
-            <div style={{ height: 16 }} />
-            <SectionView s={model.intro} cfg={cfg} update={update} version={editorVersion} />
+          <style ref={cssRef} />
+          <div className="doc pgdoc" ref={docRef} style={{ padding: `${px(HDR_DIST)} ${px(MARGIN_X)} ${px(MARGIN_Y)}` }}>
+            <div className="doc-top" data-pg-skip="" style={{ height: px(MARGIN_Y - HDR_DIST) }}>
+              <div className="doc-hdr" data-pg-hdr="">{model.header}</div>
+            </div>
+            <div className="d-title" data-pg="t0">{model.title}</div>
+            {model.subtitles.map((s, i) => <div key={s} className="d-sub" data-pg={`t${i + 1}`}>{s}</div>)}
+            <div className="d-gap" />
+            <SectionView s={model.intro} id={INTRO_ID} cfg={cfg} update={update} version={editorVersion} />
             {model.chapters.map((ch, i) => (
               <Fragment key={ch.title}>
-                {ch.pageBreak && <div className="pgbr"><span>nová stránka</span></div>}
-                <div className="d-h">{i + 1}. {ch.title}</div>
-                {ch.sections.map((s, j) => <SectionView key={j} s={s} cfg={cfg} update={update} version={editorVersion} />)}
+                <div className={`d-h${ch.pageBreak ? ' pb' : ''}`} data-pg={`h${i}`} data-pg-keep="" data-pg-break={ch.pageBreak ? '' : undefined}>{i + 1}. {ch.title}</div>
+                {ch.sections.map((s, j) => <SectionView key={j} s={s} id={sectionId(i, j)} cfg={cfg} update={update} version={editorVersion} />)}
               </Fragment>
             ))}
+            <div className="pg-layer" ref={layerRef} />
           </div>
         </div>
       )}
@@ -172,14 +198,21 @@ const TEXT_HINT: Record<TextKey, string> = {
   intro: 'Úvod', requirements: 'Doplňující text', deficiencies: 'Nedostatky soupisek', referees: 'Rozhodčí', announcements: 'Další oznámení', results: 'Hlášení výsledků',
 };
 
-function SectionView({ s, cfg, update, version }: {
-  s: Section; cfg: InitialConfig; update: (fn: (c: InitialConfig) => InitialConfig) => void; version: number;
+const px = (dxa: number) => `${(dxa / 15).toFixed(2)}px`; // 1 px = 15 DXA (preview 1:1 with the PDF)
+const Cols = ({ ws }: { ws: number[] }) => <colgroup>{ws.map((w, i) => <col key={i} style={{ width: px(w) }} />)}</colgroup>;
+
+/**
+ * One section of the preview as direct children of the document (the units of its page breaks); `id` = prefix of the
+ * PDF node ids (pdf.ts) → data-pg.
+ */
+function SectionView({ s, id, cfg, update, version }: {
+  s: Section; id: string; cfg: InitialConfig; update: (fn: (c: InitialConfig) => InitialConfig) => void; version: number;
 }) {
   const [resetN, setResetN] = useState(0);
   switch (s.type) {
     case 'rich':
       return (
-        <div className="d-rich">
+        <div className="d-rich" data-pg={id}>
           <div className="d-rich-bar">
             <span>{TEXT_HINT[s.key]} · {s.custom ? 'upraveno' : 'výchozí text (sleduje data)'}</span>
             {s.custom && (
@@ -194,39 +227,46 @@ function SectionView({ s, cfg, update, version }: {
         </div>
       );
     case 'lines':
-      return <>{s.lines.map((l) => <div key={l} className="d-p">{l}</div>)}</>;
+      return <>{s.lines.map((l, i) => <div key={i} className="d-p" data-pg={`${id}${i}`}>{l}</div>)}</>;
     case 'venues':
       return (
-        <table className="d-tbl"><tbody>
-          {s.rows.map((r) => <tr key={r.name}><td className="c w-num">{r.stc}</td><td className="b">{r.name}</td><td>{r.venue || <span className="d-missing">chybí hrací místnost</span>}</td></tr>)}
-        </tbody></table>
+        <>{s.rows.map((r, i) => (
+          <table key={i} className="d-tbl d-row" data-pg={`${id}${i}`}><Cols ws={VENUE_COLS} /><tbody>
+            <tr><td className="c">{r.stc}</td><td className="b">{r.name}</td><td>{r.venue || <span className="d-missing">chybí hrací místnost</span>}</td></tr>
+          </tbody></table>
+        ))}</>
       );
-    case 'contacts':
+    case 'contacts': {
+      let k = 0; // row index as in the PDF table (team row + its contacts)
+      const row = (key: string | undefined, cells: React.ReactNode) => (
+        <table key={key ?? `x${k}`} className="d-tbl d-row" data-pg={key} data-pg-ghost={key ? undefined : ''}><Cols ws={CONTACT_COLS} /><tbody><tr>{cells}</tr></tbody></table>
+      );
       return (
-        <table className="d-tbl"><tbody>
-          {s.teams.map((t) => (
-            <Fragment key={t.name}>
-              <tr><td colSpan={4} className="b sub">{t.name}</td></tr>
-              {t.rows.length ? t.rows.map((r, i) => <tr key={i}><td>{r.label}</td><td>{r.name}</td><td>{r.phone}</td><td>{r.email}</td></tr>)
-                : <tr><td colSpan={4}><span className="d-missing">chybí kontakty</span></td></tr>}
-            </Fragment>
-          ))}
-        </tbody></table>
+        <>{s.teams.map((t) => (
+          <Fragment key={t.name}>
+            {row(`${id}${k++}`, <td colSpan={4} className="b sub">{t.name}</td>)}
+            {t.rows.length ? t.rows.map((r) => row(`${id}${k++}`, <><td>{r.label}</td><td>{r.name}</td><td>{r.phone}</td><td>{r.email}</td></>))
+              : row(undefined, <td colSpan={4}><span className="d-missing">chybí kontakty</span></td>)}
+          </Fragment>
+        ))}</>
       );
+    }
     case 'rosters':
       return (
         <>{pairs(s.teams).map((p, i) => (
-          <div key={i} className="d-pair">
+          <div key={i} className="d-pair" data-pg={`${id}${i}`} style={{ gap: px(ROSTER_GAP), marginBottom: px(ROSTER_PAIR_GAP) }}>
             {p.map((t) => (
-              <table key={t.name} className="d-tbl d-roster"><tbody>
-                <tr className="tn"><td colSpan={7}>{t.stc}&nbsp;&nbsp;{t.name}</td></tr>
-                <tr className="sub b"><td></td><td>Jméno</td><td className="c">NRtg</td><td className="c">IRtg</td><td className="c">Z</td><td className="c">P</td><td className="c">K</td></tr>
-                {t.players.length ? t.players.map((pl) => (
-                  <tr key={pl.pos} className={pl.struck ? 'struck' : ''} title={pl.struck ? 'vyškrtnut — v definitivním zpravodaji vynechán' : undefined}>
-                    <td className="c">{pl.pos}</td><td>{pl.display}</td><td className="c">{pl.nrtg || ''}</td><td className="c">{pl.irtg || ''}</td><td className="c">{pl.z ? 'Z' : ''}</td><td className="c">{pl.letter}</td><td className="c">{pl.cap}</td>
-                  </tr>
-                )) : <tr><td colSpan={7}><span className="d-missing">soupiska chybí</span></td></tr>}
-              </tbody></table>
+              <div key={t.name} style={{ width: px(ROSTER_W) }}>
+                <div className="d-tn">{t.stc ?? ''}&nbsp;&nbsp;{t.name}</div>
+                <table className="d-tbl"><Cols ws={ROSTER_COLS} /><tbody>
+                  <tr className="sub b"><td></td><td>Jméno</td><td className="c">NRtg</td><td className="c">IRtg</td><td className="c">Z</td><td className="c">P</td><td className="c">K</td></tr>
+                  {t.players.length ? t.players.map((pl) => (
+                    <tr key={pl.pos} className={pl.struck ? 'struck' : ''} title={pl.struck ? 'vyškrtnut — v definitivním zpravodaji vynechán' : undefined}>
+                      <td className="c">{pl.pos}</td><td>{pl.display}</td><td className="c">{pl.nrtg || ''}</td><td className="c">{pl.irtg || ''}</td><td className="c">{pl.z ? 'Z' : ''}</td><td className="c">{pl.letter}</td><td className="c">{pl.cap}</td>
+                    </tr>
+                  )) : <tr><td colSpan={7}><span className="d-missing">soupiska chybí</span></td></tr>}
+                </tbody></table>
+              </div>
             ))}
           </div>
         ))}</>
@@ -234,45 +274,52 @@ function SectionView({ s, cfg, update, version }: {
     case 'rounds':
       return (
         <>
-          {s.rounds.map((r) => {
-            return (
-              <table key={r.nr} className="d-tbl d-round"><tbody>
-                <tr className="rh"><td colSpan={s.withRef ? 7 : 6}>
-                  {r.header}
-                </td></tr>
-                <tr className="sub b"><td className="c">Č.</td><td className="c">St.</td><td>Družstvo</td><td className="c">-</td><td>Družstvo</td><td className="c">St.</td>{s.withRef && <td>Rozhodčí</td>}</tr>
-                {r.rows.map((m) => (
-                  <tr key={m.board}>
-                    <td className="c">{m.board}</td><td className="c">{m.homeStc}</td>
-                    <td>{m.homeName}{m.time && <span className="tm"> {m.time}{m.time === CONFLICT ? '' : ' hodin'}</span>}</td>
-                    <td className="c">-</td><td>{m.awayName}</td><td className="c">{m.awayStc}</td>
-                    {s.withRef && <td title="Rozhodčí se mění na kartě Nominace rozhodčích">{m.ref || <span className="d-missing">nenominován</span>}</td>}
-                  </tr>
-                ))}
-              </tbody></table>
-            );
-          })}
+          {s.rounds.map((r, i) => (
+            <table key={r.nr} className="d-tbl d-round" data-pg={`${id}${i}`}><Cols ws={schedCols(s.withRef)} /><tbody>
+              <tr className="rh"><td colSpan={s.withRef ? 7 : 6}>{r.header}</td></tr>
+              <tr className="sub b"><td className="c">Č.</td><td className="c">St.</td><td>Družstvo</td><td className="c">-</td><td>Družstvo</td><td className="c">St.</td>{s.withRef && <td>Rozhodčí</td>}</tr>
+              {r.rows.map((m) => (
+                <tr key={m.board}>
+                  <td className="c">{m.board}</td><td className="c">{m.homeStc}</td>
+                  <td>{m.homeName}{m.time && <span className="tm"> {m.time}{m.time === CONFLICT ? '' : ' hodin'}</span>}</td>
+                  <td className="c">-</td><td>{m.awayName}</td><td className="c">{m.awayStc}</td>
+                  {s.withRef && <td title="Rozhodčí se mění na kartě Nominace rozhodčích">{m.ref || <span className="d-missing">nenominován</span>}</td>}
+                </tr>
+              ))}
+            </tbody></table>
+          ))}
         </>
       );
     case 'links':
-      return <>{s.links.map((l) => <div key={l.url} className="d-p">{l.label}: <a href={l.url} target="_blank" rel="noreferrer">{l.url}</a></div>)}</>;
+      return <>{s.links.map((l, i) => <div key={l.url} className="d-link" data-pg={`${id}${i}`}>{l.label}: <a href={l.url} target="_blank" rel="noreferrer">{l.url}</a></div>)}</>;
     case 'signature':
-      return <div className="d-p" style={{ marginTop: 16 }}>{s.name}{s.email && <><br />{s.email}</>}{s.phone && <><br />tel: {s.phone}</>}</div>;
+      return s.name ? <div className="d-sign" data-pg={`${id}0`}>{s.name}{s.email && <><br />{s.email}</>}{s.phone && <><br />tel: {s.phone}</>}</div> : null;
     case 'calendar':
       return (
-        <>{pairs(s.months).map((p, i) => (
-          <div key={i} className="d-pair d-cal-pair">
-            {p.map((mo) => (
-              <table key={mo.name} className="d-tbl d-cal"><tbody>
-                <tr className="tn"><td colSpan={7}>{mo.name}</td></tr>
-                <tr className="sub b">{CZ_DAYS.map((d) => <td key={d} className="c">{d}</td>)}</tr>
-                {mo.weeks.map((wk, wi) => (
-                  <tr key={wi}>{wk.map((d, di) => <td key={di} className={`c${d?.rounds.length ? ' hit' : di >= 5 ? ' we' : ''}`} title={d?.rounds.length ? `${d.rounds.join('., ')}. kolo` : undefined}>{d?.d ?? ''}</td>)}</tr>
-                ))}
-              </tbody></table>
-            ))}
-          </div>
-        ))}</>
+        <>{pairs(s.months).map((p, i) => {
+          const weeks = Math.max(...p.map((m) => m.weeks.length));
+          return (
+            <div key={i} className="d-pair d-cal-pair" data-pg={`${id}${i}`} style={{ gap: px(CAL_GAP / 2) }}>
+              {[...p, ...(p.length < 2 ? [null] : [])].map((mo, j) => (
+                <div key={j} style={{ width: px(7 * CAL_COL) }}>
+                  {mo && (
+                    <>
+                      <div className="d-tn">{mo.name}</div>
+                      <table className="d-tbl d-cal"><Cols ws={Array(7).fill(CAL_COL)} /><tbody>
+                        <tr className="sub b">{CZ_DAYS.map((d) => <td key={d} className="c">{d}</td>)}</tr>
+                        {[...mo.weeks, ...Array(weeks - mo.weeks.length).fill(Array(7).fill(null))].map((wk, wi) => (
+                          <tr key={wi} className="wk" style={{ height: px(CAL_COL) }}>{wk.map((d: typeof mo.weeks[0][0], di: number) => (
+                            <td key={di} className={d?.rounds.length ? 'hit' : di >= 5 ? 'we' : undefined} title={d?.rounds.length ? `${d.rounds.join('., ')}. kolo` : undefined}>{d?.d ?? ''}</td>
+                          ))}</tr>
+                        ))}
+                      </tbody></table>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })}</>
       );
   }
 }

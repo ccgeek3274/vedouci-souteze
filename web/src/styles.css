@@ -322,41 +322,40 @@ table.pub-current { outline: 2px solid var(--danger); outline-offset: -1px; }
 .source-list .muted { margin-left: 86px; font-size: 13px; }
 
 .doc-wrap { overflow-x: auto; margin-top: 18px; }
-.doc { width: 794px; margin: 0 auto; background: #fff; color: #000; padding: 45px 26px 60px; box-shadow: 0 2px 14px rgba(0,0,0,.35);
-  font-family: DocFont, Calibri, Carlito, sans-serif; font-size: 16px; line-height: 1.22; }
-.doc-hdr { text-align: right; font-size: 12px; margin-bottom: 18px; }
-.d-title { text-align: center; font-size: 26.7px; font-weight: 700; margin-bottom: 8px; }
-.d-sub { text-align: center; font-size: 18.7px; margin: 4px 0; }
-.d-h { font-size: 18.7px; font-weight: 700; margin: 22px 0 8px; }
-.d-p { margin: 0 0 6px; }
-.d-p ul { margin: 4px 0 8px; padding-left: 22px; }
-.d-note { font: 12.5px var(--sans); color: var(--muted); margin: 0 0 8px; display: flex; gap: 8px; align-items: center; }
+/* Úvodní zpravodaj: preview 1:1 with the PDF — 1 px = 15 DXA, pt × 4/3 = px. A flex column, so that the margins
+   add up as in pdfmake (no collapsing); paging in web/src/bulletin/paginate.ts. */
+.doc { width: 794px; margin: 0 auto; background: #fff; color: #000; box-shadow: 0 2px 14px rgba(0,0,0,.35);
+  font-family: DocFont, Calibri, Carlito, sans-serif; font-size: 16px; line-height: 1.22; display: flex; flex-direction: column;
+  -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.doc-top { flex: none; }
+.doc-hdr { text-align: right; font-size: 12px; }
+.d-title { text-align: center; font-size: 26.67px; font-weight: 700; margin-bottom: 8px; }
+.d-sub { text-align: center; font-size: 18.67px; margin: 4px 0; }
+.d-gap { flex: none; height: 16px; }
+.d-h { font-size: 18.67px; font-weight: 700; margin: 16px 0 8px; }
+.d-h.pb { margin-top: 0; }
+.d-p { margin: 0 0 4px; }
+.d-link { margin: 0 0 8px; }
+.d-sign { margin-top: 16px; }
 .d-missing { color: #b00; font-style: italic; }
-.d-tbl { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
-.d-tbl td { border: 1px solid #aaa; padding: 1px 3px; height: 21px; vertical-align: middle; }
+.d-tbl { border-collapse: collapse; table-layout: fixed; width: 100%; flex: none; }
+.d-tbl td { border: 1px solid #aaa; padding: 2px 3.33px 1.67px; vertical-align: top; overflow-wrap: anywhere; }
 .d-tbl td.c { text-align: center; }
 .d-tbl .b td, .d-tbl td.b { font-weight: 700; }
 .d-tbl .sub td, .d-tbl td.sub { background: #f2f2f2; }
-.d-tbl .w-num { width: 30px; }
-.d-tbl .tn td { border: none; border-bottom: 1px solid #aaa; font-size: 18.7px; font-weight: 700; padding-top: 6px; }
-.d-tbl .rh td { border: none; border-bottom: 1px solid #aaa; font-weight: 700; }
 .d-tbl .tm { color: #c00000; font-weight: 700; }
 .d-tbl tr.struck td { text-decoration: line-through; color: #888; }
-.d-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 20px; align-items: start; }
-.d-roster td:nth-child(1) { width: 24px; } .d-roster td:nth-child(3), .d-roster td:nth-child(4) { width: 42px; }
-.d-roster td:nth-child(5), .d-roster td:nth-child(6) { width: 20px; } .d-roster td:nth-child(7) { width: 26px; }
-.d-round td:nth-child(1) { width: 25px; } .d-round td:nth-child(2), .d-round td:nth-child(6) { width: 31px; } .d-round td:nth-child(4) { width: 19px; }
-.d-round td.ref { width: 147px; padding: 0; }
-.d-ref { width: 100%; height: 21px; border: none; background: #fffbe0; font: inherit; padding: 0 3px; }
-.d-ref.changed { background: #ffe9b0; }
-.d-ref:focus { outline: 2px solid #4a7bd0; }
-.d-cal-pair { width: 680px; margin: 0 auto 16px; gap: 27px; }
-.d-cal td { height: 42px; }
-.d-cal .sub td { height: 21px; }
+/* tables that may split between rows (venues, contacts) are one table per row, so that a row can move to the next page */
+.d-row + .d-row td { border-top: none; }
+.d-row.pg-shift td { border-top: 1px solid #aaa; }
+.d-round { margin-bottom: 16px; }
+.d-round .rh td { border: none; border-bottom: 1px solid #aaa; font-weight: 700; }
+.d-pair { display: flex; align-items: flex-start; flex: none; }
+.d-tn { font-size: 18.67px; font-weight: 700; margin-bottom: 2.67px; }
+.d-cal-pair { justify-content: center; margin-bottom: 16px; }
+.d-cal .wk td { padding: 0; vertical-align: middle; text-align: center; }
 .d-cal td.hit { background: #c8d9f0; font-weight: 700; }
 .d-cal td.we { color: #808080; }
-.pgbr { border-top: 2px dashed #bbb; margin: 28px 0 14px; text-align: center; }
-.pgbr span { position: relative; top: -10px; background: #fff; padding: 0 8px; font: 11px var(--sans); color: #888; }
 .d-rich { border: 1px dashed #c9c2a8; border-radius: 3px; margin: 4px 0 10px; }
 .d-rich-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 6px; background: #faf7ec; font: 11.5px var(--sans); color: var(--muted); }
 .rich-editor .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid #e3ddc8; padding: 3px 4px; font-family: var(--sans); }
@@ -409,7 +408,7 @@ table.pub-current { outline: 2px solid var(--danger); outline-offset: -1px; }
   color: inherit; text-align: left; padding: 3px 10px; cursor: pointer; }
 .ref-menu button:hover, .ref-menu button.on { background: #ffeb99; color: #000; }
 .ref-menu button span { color: var(--muted); font-size: 11px; }
-.rdoc .rich-editor .ql-toolbar.ql-snow { margin: 0 0 4px; }
+.rdoc .rich-editor .ql-toolbar.ql-snow, .doc .rich-editor .ql-toolbar.ql-snow { margin: 0 0 4px; }
 /* Quill as the PDF paragraphs: no padding, line 1.22, 5 pt after a paragraph (sscr-zpravodaj) */
 .rdoc .rich-editor .ql-editor { font-size: inherit; padding: 0; line-height: 1.22; min-height: 40px; }
 .rdoc .rich-editor .ql-editor > p, .rdoc .rich-editor .ql-editor > ol > li { margin: 0 0 6.67px; }
@@ -417,12 +416,18 @@ table.pub-current { outline: 2px solid var(--danger); outline-offset: -1px; }
 .rdoc .rich-editor .ql-editor li { padding-left: 24px; }
 .rdoc .rich-editor .ql-editor li > .ql-ui:before { width: 18px; margin-left: -24px; margin-right: 6px; text-align: right; }
 .rdoc .rich-editor .ql-editor.ql-blank::before { left: 0; right: 0; font-style: normal; color: #999; }
+.doc .d-rich { margin: 0; border: none; outline: 1px dashed #c9c2a8; outline-offset: 2px; }
+.doc .rich-editor .ql-editor { font-size: inherit; padding: 0; line-height: 1.22; min-height: 20px; }
+.doc .rich-editor .ql-editor > p { margin: 0 0 8px; }
+.doc .rich-editor .ql-editor ol { padding-left: 0; margin: 0 0 4px; }
+.doc .rich-editor .ql-editor > ol > li { margin: 0 0 4px; padding-left: 24px; }
+.doc .rich-editor .ql-editor li > .ql-ui:before { width: 18px; margin-left: -24px; margin-right: 6px; text-align: right; }
 /* Page breaks of the preview (web/src/bulletin/paginate.ts): shifted blocks, gaps and headers of further pages */
 @media screen {
-  .rdoc { position: relative; min-height: var(--pgh, 0); }
-  .rdoc .pg-shift { margin-top: var(--pg) !important; }
+  .pgdoc { position: relative; min-height: var(--pgh, 0); }
+  .pgdoc .pg-shift { margin-top: var(--pg) !important; }
 }
-.rdoc .pg-layer { position: absolute; inset: 0; pointer-events: none; }
-.rdoc .pg-gap { position: absolute; left: -2px; right: -2px; background: var(--screen); display: flex; align-items: center;
+.pgdoc .pg-layer { position: absolute; inset: 0; pointer-events: none; }
+.pgdoc .pg-gap { position: absolute; left: -2px; right: -2px; background: var(--screen); display: flex; align-items: center;
   justify-content: flex-end; padding: 0 6px; font: 11px/1 var(--mono); color: var(--subtitle); }
-.rdoc .pg-hdr { position: absolute; margin: 0; } /* left / right = the page margin (paginate) */
+.pgdoc .pg-hdr { position: absolute; margin: 0; } /* left / right = the page margin (paginate) */

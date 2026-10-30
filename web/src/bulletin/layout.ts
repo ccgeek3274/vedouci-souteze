@@ -54,6 +54,15 @@ export const C_CAL = 'C8D9F0';
 export const C_WKND = '808080';
 export const C_BORDER = 'AAAAAA';
 
+/** Node ids of the sections (PDF ↔ preview page breaks, see pdf.ts). */
+export const INTRO_ID = 'i.';
+export const sectionId = (chapter: number, section: number) => `s${chapter}.${section}.`;
+
+/** Address book as table rows: a team name row, then its contacts (PDF table / preview rows). */
+export function contactRows<R>(teams: { name: string; rows: R[] }[]): ({ team: string } | (R & { team?: undefined }))[] {
+  return teams.flatMap((t) => [{ team: t.name }, ...t.rows.map((r) => ({ ...r, team: undefined }))]);
+}
+
 /** Items in pairs (rosters / calendar months side by side); an odd last one stays alone on the left. */
 export function pairs<T>(list: T[]): T[][] {
   const out: T[][] = [];

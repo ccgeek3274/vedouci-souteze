@@ -42,6 +42,7 @@ Záložka **Zpravodaj** má v hlavičce přepínač *Úvodní · 1. kolo · 2. k
   s následujícím, odstavec Různé celý). Blok se posune přes `margin-top`, odstavce Quillu přes generovaný stylesheet;
   lišty editoru v sazbě nejsou (stránka s nimi je v náhledu delší). Při změně struktury (počet zápasů, písmo, vzhled,
   rozhodčí) se stará mapa zahodí. Editor Různé v náhledu bez vnitřních okrajů jako odstavce PDF.
+  Stejný mechanismus má od 30. 10. 2026 i úvodní zpravodaj (`doc/feat-zpravodaj.md`).
 - Nastavení ve dvou řádcích: datum, rozhodčí, stažení / Vzhled, Písmo (na jeden řádek se nevešly).
 
 ## Oproti sscr-zpravodaj vynecháno
