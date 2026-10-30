@@ -333,7 +333,9 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
   const chapters: Chapter[] = [
     { title: 'Hrací místnost', sections: [{ type: 'venues', rows: data.teams.map((t) => ({ stc: t.stc, name: t.name, venue: t.venue })) }] },
     {
+      // the address book and the rosters start on a new page (rosters: 2 pairs per page, see layout ROSTER_ROW_H)
       title: 'Adresář kapitánů, zástupců a organizačních pracovníků',
+      pageBreak: true,
       sections: [{
         type: 'contacts',
         teams: data.teams.map((t) => ({
@@ -342,7 +344,7 @@ export function buildModel(data: BulletinData, cfg: InitialConfig): BulletinMode
         })),
       }],
     },
-    { title: 'Soupisky družstev', sections: [{ type: 'rosters', teams: rosters }] },
+    { title: 'Soupisky družstev', pageBreak: true, sections: [{ type: 'rosters', teams: rosters }] },
     ...(definitive ? [] : [{
       title: 'Nedostatky soupisek',
       sections: [rich('deficiencies')], // generated from the roster check, editable

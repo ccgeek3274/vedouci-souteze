@@ -352,6 +352,9 @@ table.pub-current { outline: 2px solid var(--danger); outline-offset: -1px; }
 .d-round .rh td { border: none; border-bottom: 1px solid #aaa; font-weight: 700; }
 .d-pair { display: flex; align-items: flex-start; flex: none; }
 .d-tn { font-size: 18.67px; font-weight: 700; margin-bottom: 2.67px; }
+/* rosters with fixed rows as in the DOCX / PDF (ROSTER_ROW_H 314 DXA = 20.93 px + line, text line 14.4 pt) */
+.d-rn { display: flex; align-items: flex-end; margin: 0; line-height: 1.22; white-space: nowrap; overflow: hidden; }
+.d-roster td { padding-top: 0.7px; padding-bottom: 0.7px; line-height: 19.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .d-cal-pair { justify-content: center; margin-bottom: 16px; }
 .d-cal .wk td { padding: 0; vertical-align: middle; text-align: center; }
 .d-cal td.hit { background: #c8d9f0; font-weight: 700; }

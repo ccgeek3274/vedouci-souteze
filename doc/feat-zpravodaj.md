@@ -43,6 +43,12 @@ Titul (název a region z chess.cz, „(Předběžný) úvodní zpravodaj – ro�
 Rozhodčí, Další oznámení, Stránky soutěže, Hlášení výsledků + podpis vedoucího (z údajů soutěže v aplikaci),
 Kalendář (volitelně, na nové stránce).
 
+Na nové stránce začíná i **Adresář** a **Soupisky** (30. 10. 2026). Soupisky mají jako v `../uvodni-zpravodaj` pevné
+řádky (`ROSTER_TITLE_H` 420 DXA název, `ROSTER_ROW_H` 314 DXA řádek), takže se na stránku vejdou **2 dvojice = 4 soupisky**
+po 20 hráčích — v DOCX přesnou výškou řádku, v PDF řádkem písma 14,4 pt (jako DOCX `cellLine`) a dopočteným paddingem,
+v náhledu stejně v px. Nadpis kapitoly bez zlomu tvoří v PDF s prvním blokem (kolo, dvojice soupisek, odstavec)
+nedělitelný blok — pravidlo „nadpis nezůstane dole“ v `pageBreakBefore` samo nestačilo (Rozlosování zůstalo dole).
+
 ## Edge cases
 - Startovní čísla API nevrací: pořadí podle `teamId` ověřené 1. kolem Bergera, pak pořadí tabulky, pak losovací
   čísla aplikace; nesoulad s losovacími čísly aplikace = varování.

@@ -6,7 +6,7 @@ import type { RichBlock } from '../../../shared/bulletin/rich';
 import { richId } from './paginate';
 import {
   C_BORDER, C_CAL, C_SUB, C_TIME, C_WKND, CAL_COL, CAL_GAP, CONTACT_COLS, MARGIN_X, MARGIN_Y, HDR_DIST,
-  ROSTER_COLS, ROSTER_GAP, ROSTER_HDRS, ROSTER_PAIR_GAP, ROSTER_W, SCHED_HDRS, VENUE_COLS, contactRows, INTRO_ID, pairs, schedCols, sectionId,
+  ROSTER_COLS, ROSTER_GAP, ROSTER_HDRS, ROSTER_PAIR_GAP, ROSTER_W, ROSTER_ROW_H, ROSTER_TITLE_H, GAP_PARA_H, cellLine, SCHED_HDRS, VENUE_COLS, contactRows, INTRO_ID, pairs, schedCols, sectionId,
 } from './layout';
 
 const pt = (dxa: number) => dxa / 20;
@@ -21,6 +21,8 @@ const LAYOUT = {
 };
 const NO_LINES = { ...LAYOUT, hLineWidth: () => 0, vLineWidth: () => 0 };
 const SUB = `#${C_SUB}`;
+/** Carlito's natural line (lineHeight 1) = 2500 / 2048 of the font size. */
+const NATURAL_LINE = 2500 / 2048;
 
 // Node ids (data-pg in the preview, for its page breaks): t* titles, h* chapters, sections `i.` (intro) / `s{ch}.{n}.`
 // + order of the item (paragraph, line, table row, roster / calendar pair, round, link).
@@ -50,13 +52,21 @@ function rich(blocks: RichBlock[], id: string): any[] {
   return out;
 }
 
+// Rosters as in the DOCX (fixed rows): the name in a ROSTER_TITLE_H band (text at the bottom), every row ROSTER_ROW_H
+// with the text line exactly 12 pt × 1.2 → 2 pairs of rosters with 20 players fit on a page.
+const ROSTER_LINE = cellLine() / 20; // 14.4 pt
+const ROSTER_PAD = (pt(ROSTER_ROW_H) - ROSTER_LINE) / 2;
+const ROSTER_LAYOUT = { ...LAYOUT, paddingTop: () => ROSTER_PAD, paddingBottom: () => ROSTER_PAD };
+const NAME_LINE = 14 * NATURAL_LINE;
+
 function rosterTable(t: { stc: number | null; name: string; players: RosterRow[] }, id?: string) {
   const al = ['center', 'left', 'center', 'center', 'center', 'center', 'center'];
   return {
     width: pt(ROSTER_W),
     stack: [
-      { id, text: `${t.stc ?? ''}  ${t.name}`, bold: true, fontSize: 14, margin: [0, 0, 0, 2] },
+      { id, text: `${t.stc ?? ''}  ${t.name}`, bold: true, fontSize: 14, margin: [0, pt(ROSTER_TITLE_H) - NAME_LINE, 0, 0] },
       {
+        lineHeight: ROSTER_LINE / (FS * NATURAL_LINE),
         table: {
           widths: widths(ROSTER_COLS), dontBreakRows: true,
           body: [
@@ -64,7 +74,7 @@ function rosterTable(t: { stc: number | null; name: string; players: RosterRow[]
             ...t.players.map((p) => [p.pos, p.display, p.nrtg || '', p.irtg || '', p.z ? 'Z' : '', p.letter, p.cap].map((v, i) => ({ text: String(v), alignment: al[i] }))),
           ],
         },
-        layout: LAYOUT,
+        layout: ROSTER_LAYOUT,
       },
     ],
   };
@@ -136,7 +146,8 @@ function section(s: Section, id: string): any[] {
       layout: LAYOUT,
     }];
     case 'rosters': return pairs(s.teams).map((p, k) => ({
-      columns: p.map((t, j) => rosterTable(t, j ? undefined : `${id}${k}`)), columnGap: pt(ROSTER_GAP), unbreakable: true, margin: [0, 0, 0, pt(ROSTER_PAIR_GAP)],
+      columns: p.map((t, j) => rosterTable(t, j ? undefined : `${id}${k}`)), columnGap: pt(ROSTER_GAP), unbreakable: true,
+      margin: [0, 0, 0, pt(ROSTER_PAIR_GAP + GAP_PARA_H)],
     }));
     case 'rounds': return s.rounds.map((r, k) => roundTable(r, s.withRef, `${id}${k}`));
     case 'links': return s.links.map((l, k) => ({ id: `${id}${k}`, text: [`${l.label}: `, { text: l.url, link: l.url, color: '#0563C1', decoration: 'underline' }], margin: [0, 0, 0, 6] }));
@@ -163,8 +174,13 @@ export function buildPdfDef(model: BulletinModel): any {
     ...section(model.intro, INTRO_ID),
   ];
   model.chapters.forEach((c, i) => {
-    content.push({ id: `h${i}`, text: `${i + 1}.  ${c.title}`, bold: true, fontSize: 14, margin: [0, c.pageBreak ? 0 : 12, 0, 6], pageBreak: c.pageBreak ? 'before' : undefined, headlineLevel: 1 });
-    content.push(...c.sections.flatMap((s, j) => section(s, sectionId(i, j))));
+    const head = { id: `h${i}`, text: `${i + 1}.  ${c.title}`, bold: true, fontSize: 14, margin: [0, c.pageBreak ? 0 : 12, 0, 6], pageBreak: c.pageBreak ? 'before' : undefined, headlineLevel: 1 };
+    const body = c.sections.flatMap((s, j) => section(s, sectionId(i, j)));
+    // pdfmake has no keepNext: the heading and the first block (a round, a roster pair, a paragraph) are one unbreakable
+    // block; a table that may split (venues, address book) or a list relies on the heading rule in pageBreakBefore
+    if (!c.pageBreak && body[0] && (body[0].unbreakable || body[0].text !== undefined)) content.push({ stack: [head, body.shift()], unbreakable: true });
+    else content.push(head);
+    content.push(...body);
   });
   return {
     pageSize: 'A4',

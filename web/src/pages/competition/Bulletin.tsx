@@ -13,7 +13,7 @@ import {
   buildModel, CONFLICT, CZ_DAYS, normalizeConfig, type InitialConfig, type Section, type TextKey,
 } from '../../../../shared/bulletin/initial';
 import {
-  CAL_COL, CAL_GAP, CONTACT_COLS, HDR_DIST, INTRO_ID, MARGIN_X, MARGIN_Y, ROSTER_COLS, ROSTER_GAP, ROSTER_PAIR_GAP, ROSTER_W,
+  CAL_COL, CAL_GAP, CONTACT_COLS, GAP_PARA_H, HDR_DIST, ROSTER_TITLE_H, INTRO_ID, MARGIN_X, MARGIN_Y, ROSTER_COLS, ROSTER_GAP, ROSTER_PAIR_GAP, ROSTER_W,
   VENUE_COLS, pairs, schedCols, sectionId,
 } from '../../bulletin/layout';
 import { downloadBlob, SAVE_TEXT, saveTagClass, SavepointsCard, useBulletinDraft } from '../../bulletin/draft';
@@ -254,11 +254,11 @@ function SectionView({ s, id, cfg, update, version }: {
     case 'rosters':
       return (
         <>{pairs(s.teams).map((p, i) => (
-          <div key={i} className="d-pair" data-pg={`${id}${i}`} style={{ gap: px(ROSTER_GAP), marginBottom: px(ROSTER_PAIR_GAP) }}>
+          <div key={i} className="d-pair" data-pg={`${id}${i}`} style={{ gap: px(ROSTER_GAP), marginBottom: px(ROSTER_PAIR_GAP + GAP_PARA_H) }}>
             {p.map((t) => (
               <div key={t.name} style={{ width: px(ROSTER_W) }}>
-                <div className="d-tn">{t.stc ?? ''}&nbsp;&nbsp;{t.name}</div>
-                <table className="d-tbl"><Cols ws={ROSTER_COLS} /><tbody>
+                <div className="d-tn d-rn" style={{ height: px(ROSTER_TITLE_H) }}>{t.stc ?? ''}&nbsp;&nbsp;{t.name}</div>
+                <table className="d-tbl d-roster"><Cols ws={ROSTER_COLS} /><tbody>
                   <tr className="sub b"><td></td><td>Jméno</td><td className="c">NRtg</td><td className="c">IRtg</td><td className="c">Z</td><td className="c">P</td><td className="c">K</td></tr>
                   {t.players.length ? t.players.map((pl) => (
                     <tr key={pl.pos} className={pl.struck ? 'struck' : ''} title={pl.struck ? 'vyškrtnut — v definitivním zpravodaji vynechán' : undefined}>
